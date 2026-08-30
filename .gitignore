@@ -14,6 +14,7 @@ output/*
 vocab.txt
 .hotword_cache.json
 .context_scan_cache.json
-ready_for_human_review/
+ready_for_human_review/*
+!ready_for_human_review/.gitkeep
 docs/
 CLAUDE.md
