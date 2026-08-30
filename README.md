@@ -1,5 +1,7 @@
 # auto-subtitle
 
+English | [中文](README.zh-CN.md)
+
 Fully local video/audio → translated subtitle pipeline: faster-whisper ASR →
 chunked LLM translation → proofread → three-model audio arbitration →
 evidence-gated semantic review → organized per-work output.
