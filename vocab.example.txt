@@ -1,0 +1,10 @@
+# Vocabulary file for auto-subtitle translation
+# One term per line, in either source or target language.
+# These words are prepended to the translation instruction
+# so the model is primed with domain-specific terminology.
+#
+# Examples:
+魔法少女
+変身
+結界
+使い魔

@@ -1,0 +1,11 @@
+faster-whisper>=1.1.0
+demucs>=4.0.0
+torch>=2.0.0
+# torchaudio>=2.9 saves audio through torchcodec; demucs' stem writing dies
+# without it. Version must match torch (2.10 ↔ 0.10.x, cu128 wheel index),
+# and the CUDA build additionally dlopens NPP from pip's nvidia-* packages
+# (src/cuda_paths.py exports their lib dirs).
+torchcodec==0.10.*
+nvidia-npp-cu12
+requests>=2.28.0
+pypdf>=3.0.0
