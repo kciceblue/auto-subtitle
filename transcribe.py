@@ -134,8 +134,15 @@ def process_file(
         segments = transcribe(model, audio_for_asr, config)
 
         if not segments:
-            logger.error("No speech segments detected in %s", input_path.name)
-            return False
+            # Rest / no-dialogue tracks (e.g. 一緒に休憩) are VAD-empty, not a
+            # hard failure. Returning True lets the ASR worker keep a 0 exit
+            # so run.sh's set -e does not abort Phase 2–4 for the rest of the
+            # batch. No SRT is written; pipeline/organize treat that as skip.
+            logger.warning(
+                "No speech segments detected in %s — skipping as empty/rest track",
+                input_path.name,
+            )
+            return True
 
         # Step 4: Write SRT
         write_srt(segments, output_path)

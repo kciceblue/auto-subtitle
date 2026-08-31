@@ -9,8 +9,8 @@ of VRAM returns to the GPU.
 
 This module is the subprocess entry point. The parent (transcribe.py) builds
 a JSON spec and spawns `python -m src.asr_worker <spec>`. Logging inherits
-the parent's stdout/stderr; the exit code is 0 only when every file was
-transcribed.
+the parent's stdout/stderr. Exit 0 unless every file hard-failed; empty/rest
+tracks (no VAD speech) are skips, not failures.
 """
 
 from __future__ import annotations

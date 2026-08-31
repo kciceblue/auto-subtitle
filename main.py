@@ -1010,12 +1010,17 @@ def cmd_pipeline(args: argparse.Namespace) -> int:
     from src.title_context import extract_title
 
     failed_files: list[Path] = []
+    skipped_empty: list[Path] = []
     for srt_path in srt_paths:
         if not srt_path.is_file():
-            # Per-file ASR failure (the worker keeps going; only all-failed
-            # exits non-zero). Skip it here instead of crashing the batch.
-            logger.error("ASR produced no SRT for %s — skipping translation", srt_path)
-            failed_files.append(srt_path)
+            # Empty/rest track: VAD found no speech, process_file wrote nothing.
+            # Skip translation; do NOT mark the batch failed (8/30: one rest
+            # track returned 1 and run.sh set -e killed Phase 2–4 for 89 others).
+            logger.warning(
+                "ASR produced no SRT for %s — empty/rest track, skipping translation",
+                srt_path,
+            )
+            skipped_empty.append(srt_path)
             continue
 
         media = media_by_srt.get(srt_path)
@@ -1085,10 +1090,15 @@ def cmd_pipeline(args: argparse.Namespace) -> int:
         logger.info("Moving input files to output directory...")
         _move_input_to_output(input_dir, output_dir)
 
+    if skipped_empty:
+        logger.warning(
+            "%d empty/rest track(s) produced no SRT (skipped, not a batch "
+            "failure): %s",
+            len(skipped_empty), [str(p) for p in skipped_empty],
+        )
     if failed_files:
         logger.error(
-            "%d file(s) failed (ASR produced no SRT, or a pass failed on "
-            "every chunk): %s",
+            "%d file(s) failed (a pass failed on every chunk): %s",
             len(failed_files), [str(p) for p in failed_files],
         )
         return 1

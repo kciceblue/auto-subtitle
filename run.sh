@@ -30,7 +30,15 @@ set -euo pipefail
 #     最后 organize 收尾（media+SRT → final/，其余 → review/）。
 #   - MEDIA 清单必须在 Phase 1 之前采集：批量模式的 pipeline 结束时把
 #     input/ 整体搬去 output/，之后再 find input/ 只会得到空集（8/30 bug：
-#     批量模式 Phase 2+3 因此从未运行过）。
+#     批量模式 Phase 2+3 因此从未运行过）。input/ 已空时改为从 output/
+#     收集并跳过 Phase 1（8/31 续跑）。
+#   - Phase 2/3 单轨失败不得 set -e 掐掉其余轨。
+#   - 长批次用 systemd 用户服务，不要 Hermes background / --scope：
+#     systemd-run --user --no-block --collect --unit=autosub-batch \
+#       --working-directory="$PWD" \
+#       bash -lc 'export PYTHONUNBUFFERED=1; exec ./run.sh'
+#     日更 hermes update 会重启 gateway、杀掉 hermes-worker 子进程
+#     （8/31：43/89 review 在 06:58 被杀）。
 #   - 仲裁子进程内部自动做 GPU headroom 检查（ensure_gpu_headroom 通用化：
 #     显存不足自动 /admin/unload 驱逐 warden LLM），不会与 27B dflash 抢显存。
 #   - review 子命令 main.py review 自动内容扫描（script 类 context 自动作为
@@ -141,20 +149,45 @@ done
 # Resolve the media list BEFORE Phase 1: batch-mode pipeline moves input/ to
 # output/ when it finishes, so a find run afterwards sees an empty input/ and
 # Phases 2-4 silently do nothing (the 8/30 batch bug).
+# Resume (8/31): if input/ is already empty, collect from output/ and skip Phase 1.
+find_media() {
+  local root="$1"
+  [[ -d "$root" ]] || return 0
+  find "$root" -type f \( -iname '*.wav' -o -iname '*.mp3' -o -iname '*.m4a' \
+    -o -iname '*.flac' -o -iname '*.ogg' -o -iname '*.aac' \
+    -o -iname '*.mkv' -o -iname '*.mp4' -o -iname '*.webm' \) -print0
+}
+
+SKIP_PHASE1=0
 if [[ ${#USER_ARGS[@]} -gt 0 ]]; then
   MEDIA=("${USER_ARGS[@]}")
 else
   MEDIA=()
-  while IFS= read -r -d '' f; do MEDIA+=("$f"); done < <(
-    find input -type f \( -iname '*.wav' -o -iname '*.mp3' -o -iname '*.m4a' \
-      -o -iname '*.flac' -o -iname '*.ogg' -o -iname '*.aac' \
-      -o -iname '*.mkv' -o -iname '*.mp4' -o -iname '*.webm' \) -print0
-  )
+  while IFS= read -r -d '' f; do MEDIA+=("$f"); done < <(find_media input)
+  if [[ ${#MEDIA[@]} -eq 0 ]]; then
+    while IFS= read -r -d '' f; do MEDIA+=("$f"); done < <(find_media output)
+    if [[ ${#MEDIA[@]} -gt 0 ]]; then
+      SKIP_PHASE1=1
+      echo "Phase 1 SKIP — input/ empty, resuming ${#MEDIA[@]} media from output/"
+    fi
+  fi
 fi
 
 # ── Phase 1: transcribe + translate (+ proofread) ────────────────────
-echo "═══════ Phase 1: pipeline (ASR → translate → proofread) ═══════"
-"$PY" main.py "${PIPELINE_ARGS[@]}"
+# Empty/rest tracks used to make pipeline exit 1; with set -e that aborted
+# Phase 2–4 for the whole batch (8/30: 05-一緒に休憩). Pipeline now treats
+# no-speech as skip, but still continue 2–4 if Phase 1 is non-zero so a
+# single real failure cannot kill adjudication/review of the other tracks.
+pipe_rc=0
+if [[ "$SKIP_PHASE1" == "1" ]]; then
+  echo "═══════ Phase 1: skipped (resume from output/) ═══════"
+else
+  echo "═══════ Phase 1: pipeline (ASR → translate → proofread) ═══════"
+  "$PY" main.py "${PIPELINE_ARGS[@]}" || pipe_rc=$?
+  if [[ "$pipe_rc" -ne 0 ]]; then
+    echo "WARN: Phase 1 exited $pipe_rc — continuing Phase 2+ (files without srt/zh are SKIP)"
+  fi
+fi
 
 if [[ "$ADJUDICATE" == "1" || "$REVIEW" == "1" ]]; then
 
@@ -187,8 +220,11 @@ for media in "${MEDIA[@]}"; do
   # dflash for review. Headroom/eviction handled inside (ensure_gpu_headroom).
   if [[ "$ADJUDICATE" == "1" && ! -f "$adj_json" ]]; then
     echo "═══════ Phase 2: arbitrate $stem ═══════"
-    "$PY" -m src.adjudicate --srt "$src_srt" --media "$media_now" \
-      --suspicious all --out "$adj_json"
+    if ! "$PY" -m src.adjudicate --srt "$src_srt" --media "$media_now" \
+      --suspicious all --out "$adj_json"; then
+      echo "FAIL adjudicate: $rel — continuing remaining tracks"
+      continue
+    fi
   fi
 
   # Phase 3: FTDC review (auto context scan; script-kind context auto-anchors)
@@ -212,7 +248,10 @@ for media in "${MEDIA[@]}"; do
       for ctx in ${CONTEXT_FILES[@]+"${CONTEXT_FILES[@]}"}; do
         REVIEW_ARGS+=(--context-file "$ctx")
       done
-      "$PY" "${REVIEW_ARGS[@]}"
+      if ! "$PY" "${REVIEW_ARGS[@]}"; then
+        echo "FAIL review: $rel — continuing remaining tracks"
+        continue
+      fi
     fi
   fi
 done
@@ -222,7 +261,8 @@ fi  # ADJUDICATE/REVIEW
 # ── Phase 4: organize output/<unit>/{final,review}/ + input cleanup ──
 if [[ "$ORGANIZE" == "1" ]]; then
   echo "═══════ Phase 4: organize output ═══════"
-  "$PY" main.py organize
+  "$PY" main.py organize || echo "WARN organize exited $?"
 fi
 
 echo "ALL DONE"
+exit "$pipe_rc"

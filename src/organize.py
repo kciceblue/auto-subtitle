@@ -13,8 +13,9 @@ under output/ named after the unit:
 organize_unit() is the workflow's closing step (run.sh Phase 4): it moves the
 pipeline's mirrored output plus any files still sitting on the input side
 into this layout, then prunes the emptied input/<unit> directory. It refuses
-to touch an *incomplete* unit (a media file without a translated SRT), so a
-partially-failed batch stays in place for a re-run.
+to touch an *incomplete* unit (a media file that has a source .srt but no
+translated SRT). Media with no source .srt at all is an empty/rest track
+(VAD found no speech) and does not block the unit.
 
 archive_unit() is the MANUAL hand-off step (./run.sh archive [unit ...]):
 it zips output/<unit> and moves both the folder and the zip into
@@ -130,6 +131,21 @@ def _has_translation(
     return False
 
 
+def _has_source_srt(
+    stem: str, rel_dir: Path, files: list[tuple[Path, Path]], final_root: Path
+) -> bool:
+    """A source ``<stem>.srt`` for media in ``rel_dir`` exists somewhere."""
+    name = stem + ".srt"
+    for _p, rel in files:
+        if rel.parent == rel_dir and rel.name == name:
+            return True
+    if final_root.is_dir():
+        candidate = final_root / rel_dir / name
+        if candidate.is_file():
+            return True
+    return False
+
+
 def _prune_empty_dirs(root: Path) -> None:
     """Remove empty directories under (and including) root, bottom-up."""
     if not root.is_dir():
@@ -152,9 +168,11 @@ def organize_unit(
 ) -> bool:
     """Organize one unit into output/<unit>/{final,review}/ and clean input.
 
-    Returns True when files were moved. An incomplete unit (media without a
-    translated SRT) is left untouched with a warning so a re-run can finish
-    it. Already-organized units are a no-op.
+    Returns True when files were moved. An incomplete unit (media that has a
+    source .srt but no translated SRT) is left untouched with a warning so a
+    re-run can finish it. Media with no source .srt is treated as an
+    empty/rest track and does not block the unit. Already-organized units
+    are a no-op.
     """
     files = _unit_files(unit, input_dir, output_dir)
     if not files:
@@ -165,10 +183,22 @@ def organize_unit(
     final_root = unit_root / FINAL_DIR
 
     media = [(p, rel) for p, rel in files if _is_media(p)]
-    missing = [
-        rel for p, rel in media
-        if not _has_translation(p.stem, rel.parent, files, final_root)
-    ]
+    missing = []
+    skipped_empty = []
+    for p, rel in media:
+        if _has_translation(p.stem, rel.parent, files, final_root):
+            continue
+        if not _has_source_srt(p.stem, rel.parent, files, final_root):
+            skipped_empty.append(rel)
+            continue
+        missing.append(rel)
+    if skipped_empty:
+        logger.info(
+            "Organize %s: %d empty/rest track(s) have no ASR SRT, not blocking "
+            "(%s)",
+            unit, len(skipped_empty),
+            ", ".join(str(m) for m in skipped_empty[:5]),
+        )
     if missing:
         logger.warning(
             "Organize %s: SKIPPED — %d media file(s) have no translated SRT "
