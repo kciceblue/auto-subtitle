@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "target_score": 4,
+  "qualified": false,
+  "trials": [
+    {
+      "id": "LC",
+      "path": "/home/kciceblue/HF/auto-subtitle/output/quality-long-context-gemma-20260915",
+      "method": "Whole-episode Gemma with all source evidence",
+      "score": 3,
+      "target_sha256": "1cd56c0f6b6208dd2cfcad5a380fa8f12379e1802eff0517d412d55b71f1ca79",
+      "dispatch_id": "75a382f2-31a4-4f4d-be27-c81224772473"
+    },
+    {
+      "id": "GT",
+      "path": "/home/kciceblue/HF/auto-subtitle/output/quality-gemma-thinking-20260916",
+      "method": "Same evidence, reasoning enabled",
+      "score": 3,
+      "target_sha256": "ee5c30cf77a2f948fe6fe0a3d770617216a0a6a89addf8a99e364351b70c5953",
+      "dispatch_id": "0566386c-0d83-46ba-b591-51da10a15b61"
+    },
+    {
+      "id": "CS",
+      "path": "/home/kciceblue/HF/auto-subtitle/output/quality-compact-source-20260916",
+      "method": "Lossless compact expanded source evidence",
+      "score": 3,
+      "target_sha256": "05f2425ae8e872e0c8b783729dc93ba31337e2e2e002fd62188bd55614cc812d",
+      "dispatch_id": "78e228f5-fc87-42ed-ab5d-d7fa1e3a2acc"
+    },
+    {
+      "id": "AM",
+      "path": "/home/kciceblue/HF/auto-subtitle/output/quality-masked-source-draft-continuation-20260916",
+      "method": "Corrected Qwen audio-attention masking",
+      "score": 3,
+      "target_sha256": "e1eee12897f78439cb397332cf408bfb81f93cf58cf6a25fcdfdc28d9d832279",
+      "dispatch_id": "43c1e136-76cb-4d72-9eb4-f4d1f449b007"
+    },
+    {
+      "id": "V",
+      "path": "/home/kciceblue/HF/auto-subtitle/output/quality-voxtral-source-draft-20260916",
+      "method": "Added Voxtral recognition",
+      "score": 3,
+      "target_sha256": "e47d1ff11e9161cfd963c2bb29791c26625e5665565719070d913265005bf18a",
+      "dispatch_id": "f781686d-6420-4787-9efb-2c1fe19067ec"
+    },
+    {
+      "id": "BT",
+      "path": "/home/kciceblue/HF/auto-subtitle/output/quality-blind-backtranslation-20260916",
+      "method": "Local backtranslation and one repair",
+      "score": 3,
+      "target_sha256": "6cdf29ca14d1e263fe81d57351ec8c2e147a9cca2a28276260cdae01996286f1",
+      "dispatch_id": "acb19273-bb4a-4c1b-9456-1d71ef9da2c6"
+    }
+  ],
+  "current_stage": "cleanup_complete_no_active_inference",
+  "cleanup_audit": "/home/kciceblue/HF/auto-subtitle/design/cleanup-best-six-20260916"
+}

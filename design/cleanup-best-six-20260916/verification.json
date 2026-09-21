@@ -1,0 +1,75 @@
+{
+  "pins_checked": 1501,
+  "pin_mismatch_paths": [],
+  "imports": [
+    {
+      "module": "src.selected_pipeline",
+      "ok": true
+    },
+    {
+      "module": "scripts.long_context_gemma_screen",
+      "ok": true
+    },
+    {
+      "module": "scripts.gemma_thinking_screen",
+      "ok": true
+    },
+    {
+      "module": "scripts.compact_source_screen",
+      "ok": true
+    },
+    {
+      "module": "scripts.masked_source_screen",
+      "ok": true
+    },
+    {
+      "module": "scripts.voxtral_source_screen",
+      "ok": true
+    },
+    {
+      "module": "scripts.blind_backtranslation_screen",
+      "ok": true
+    }
+  ],
+  "trials": [
+    {
+      "id": "LC",
+      "score_unchanged": true,
+      "target_identity_unchanged": true,
+      "alias_resolves": true
+    },
+    {
+      "id": "GT",
+      "score_unchanged": true,
+      "target_identity_unchanged": true,
+      "alias_resolves": true
+    },
+    {
+      "id": "CS",
+      "score_unchanged": true,
+      "target_identity_unchanged": true,
+      "alias_resolves": true
+    },
+    {
+      "id": "AM",
+      "score_unchanged": true,
+      "target_identity_unchanged": true,
+      "alias_resolves": true
+    },
+    {
+      "id": "V",
+      "score_unchanged": true,
+      "target_identity_unchanged": true,
+      "alias_resolves": true
+    },
+    {
+      "id": "BT",
+      "score_unchanged": true,
+      "target_identity_unchanged": true,
+      "alias_resolves": true
+    }
+  ],
+  "selected_sha256": "912896c8304f35b21dcbe042402e359ee3ebc363be1a1af6698ba9852092dae2",
+  "selected_unchanged": true,
+  "seconds": 6.7854625819891226
+}

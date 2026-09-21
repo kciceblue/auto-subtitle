@@ -12,7 +12,7 @@ import os
 import re
 import shutil
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import requests
@@ -176,9 +176,9 @@ def build_instruction(
         source_lang=config.source_lang,
         target_lang=config.target_lang,
     )
-    if config.context_files or config.title:
-        context_text = _load_context(config.context_files, kinds=config.context_kinds,
-                                     title=config.title)
+    if config.context_summary or config.context_files or config.title:
+        context_text = config.context_summary or _load_context(
+            config.context_files, kinds=config.context_kinds, title=config.title)
         if context_text:
             instruction += (
                 "\n=== WORK CONTEXT (synopsis/script reference material — use "
@@ -210,15 +210,19 @@ class SrtBlock:
     text: str
 
 
-def parse_srt(path: Path) -> list[SrtBlock]:
-    """Parse an SRT file into a list of SrtBlock entries."""
+def parse_srt(path: Path, *, preserve_text_whitespace: bool = False) -> list[SrtBlock]:
+    """Parse SRT; opt into lossless body whitespace for serialization checks.
+
+    The default retains historical per-line trimming for translation inputs.
+    Headers and newline encodings are normalized in both modes.
+    """
     raw = path.read_text(encoding="utf-8-sig")
     raw = raw.replace("\r\n", "\n").replace("\r", "\n")
-    chunks = re.split(r"\n\s*\n", raw.strip())
+    chunks = re.split(r"\n\s*\n", raw.strip("\n") if preserve_text_whitespace else raw.strip())
 
     blocks: list[SrtBlock] = []
     for chunk in chunks:
-        lines = chunk.strip().splitlines()
+        lines = (chunk.strip("\n") if preserve_text_whitespace else chunk.strip()).splitlines()
         if len(lines) < 3:
             continue
         try:
@@ -227,7 +231,7 @@ def parse_srt(path: Path) -> list[SrtBlock]:
             logger.warning("Skipping malformed SRT block: %s", lines[0])
             continue
         ts_line = lines[1].strip()
-        text = "\n".join(line.strip() for line in lines[2:])
+        text = "\n".join(lines[2:] if preserve_text_whitespace else (line.strip() for line in lines[2:]))
         blocks.append(SrtBlock(index=index, ts_line=ts_line, text=text))
 
     logger.info("Parsed %d SRT blocks from %s", len(blocks), path)
@@ -268,6 +272,10 @@ class EmptyContentError(RuntimeError):
     pass
 
 
+class LLMRetryExhaustedError(RuntimeError):
+    """A model call exhausted its retry budget; no output was accepted."""
+
+
 class AllChunksFailedError(RuntimeError):
     """Raised when every chunk of a whole-file pass failed.
 
@@ -286,6 +294,8 @@ class StreamResult:
     content: str
     reasoning_chars: int = 0
     finish_reason: str | None = None
+    usage: dict | None = None
+    timings: dict | None = None
 
 
 def _stream_response(
@@ -315,6 +325,8 @@ def _stream_response(
     total_len = 0
     reasoning_chars = 0
     finish_reason: str | None = None
+    usage = None
+    timings = None
 
     try:
         for raw_line in resp.iter_lines(decode_unicode=True):
@@ -328,6 +340,8 @@ def _stream_response(
                 chunk = json.loads(data_str)
             except json.JSONDecodeError:
                 continue
+            usage = chunk.get("usage") or usage
+            timings = chunk.get("timings") or timings
 
             try:
                 choice = chunk["choices"][0]
@@ -364,7 +378,7 @@ def _stream_response(
     return StreamResult(
         content="".join(collected),
         reasoning_chars=reasoning_chars,
-        finish_reason=finish_reason,
+        finish_reason=finish_reason, usage=usage, timings=timings,
     )
 
 
@@ -416,14 +430,17 @@ def _build_payload(
     semantic review pass, which needs genuine analysis rather than a
     surface-consistency check).
     """
-    payload: dict = {
-        "messages": [
-            {"role": "user", "content": f"{instruction}\n{content}"},
-        ],
-        "max_tokens": max_tokens,
-    }
+    messages = [{"role": "user", "content": f"{instruction}\n{content}"}]
+    if config.separate_instruction:
+        # Recurrent model caches can checkpoint at this real message boundary.
+        # Keep the legacy one-message format unless the caller opts in.
+        messages = [{"role": "system", "content": instruction},
+                    {"role": "user", "content": content}]
+    payload: dict = {"messages": messages, "max_tokens": max_tokens}
     if stream:
         payload["stream"] = True
+        if config.telemetry_path is not None:
+            payload["stream_options"] = {"include_usage": True}
     if config.extra_payload:
         payload.update(config.extra_payload)
     if not with_thinking:
@@ -450,7 +467,7 @@ def call_llm(
     the model is allowed to think, and only the budget is grown when
     the response comes back empty.
     """
-    expected_len = len(content)
+    expected_len = max(len(content), config.response_guard_floor)
     max_tokens = config.max_tokens
     variant = 0
     use_streaming = True
@@ -463,14 +480,28 @@ def call_llm(
             time.sleep(wait)
         payload = _build_payload(
             content, instruction, config,
-            _THINKING_OFF_VARIANTS[variant], max_tokens, stream=True,
+            _THINKING_OFF_VARIANTS[variant], max_tokens, stream=use_streaming,
             with_thinking=with_thinking,
         )
+        started = time.monotonic()
+        recorded = False
         try:
             if use_streaming:
-                result = _stream_response(
-                    config.endpoint, payload, config.timeout, expected_len,
-                )
+                try:
+                    result = _stream_response(
+                        config.endpoint, payload, config.timeout, expected_len,
+                    )
+                except requests.exceptions.HTTPError as exc:
+                    if exc.response is None or exc.response.status_code != 400:
+                        raise
+                    use_streaming = False
+                    logger.info("Streaming rejected; retrying non-streaming in the same attempt")
+                    payload = _build_payload(content, instruction, config, _THINKING_OFF_VARIANTS[variant],
+                                             max_tokens, stream=False, with_thinking=with_thinking)
+                    result = _call_llm_non_streaming(
+                        content, instruction, config, _THINKING_OFF_VARIANTS[variant],
+                        max_tokens, with_thinking=with_thinking,
+                    )
             else:
                 # Same attempt budget and escalation as the streaming path —
                 # the fallback is just another way to issue this attempt.
@@ -479,6 +510,12 @@ def call_llm(
                     _THINKING_OFF_VARIANTS[variant], max_tokens,
                     with_thinking=with_thinking,
                 )
+            _record_request(config, attempt, started, with_thinking, result, payload=payload)
+            recorded = True
+            if (config.translation_episode_context and config.stage == "translation"
+                    and result.finish_reason == "length"):
+                raise RuntimeError("Episode-context draft exhausted output/context capacity; "
+                                   "refusing a potentially truncated translation")
             if result.content.strip():
                 return result.content
             # No answer: almost always the budget went into reasoning_content.
@@ -511,6 +548,11 @@ def call_llm(
                         attempt + 1,
                     )
                     with_thinking = False
+                    extra = dict(config.extra_payload or {})
+                    extra["reasoning_effort"] = "none"
+                    extra["chat_template_kwargs"] = {
+                        **(extra.get("chat_template_kwargs") or {}), "enable_thinking": False}
+                    config = replace(config, extra_payload=extra)
                     variant = 0
                 continue
             logger.warning(
@@ -545,7 +587,8 @@ def call_llm(
                 last_err = e
                 logger.warning("Server error %d, will retry", e.response.status_code)
                 continue
-            raise
+            last_err = e
+            raise RuntimeError(f"LLM rejected request: {e}") from e
         except requests.exceptions.Timeout as e:
             last_err = e
             logger.warning("Request timed out, will retry")
@@ -554,8 +597,13 @@ def call_llm(
             last_err = e
             logger.warning("Request failed: %s", e)
             continue
+        finally:
+            if not recorded:
+                _record_request(config, attempt, started, with_thinking,
+                                StreamResult(content="", finish_reason="request_failed"), payload=payload)
 
-    raise RuntimeError(f"LLM call failed after {1 + config.retries} attempts: {last_err}")
+    raise LLMRetryExhaustedError(
+        f"LLM call failed after {1 + config.retries} attempts: {last_err}") from last_err
 
 
 def _call_llm_non_streaming(
@@ -592,7 +640,37 @@ def _call_llm_non_streaming(
         raise
     except (requests.exceptions.RequestException, ValueError) as e:
         raise TransportError(f"non-streaming request failed: {e}") from e
-    return StreamResult(content=output, finish_reason=_finish_reason(data))
+    message = data.get("choices", [{}])[0].get("message", {})
+    return StreamResult(content=output, finish_reason=_finish_reason(data),
+                        reasoning_chars=len(message.get("reasoning_content") or ""),
+                        usage=data.get("usage"), timings=data.get("timings"))
+
+
+def _record_request(config: TranslateConfig, attempt: int, started: float,
+                    thinking: bool, result: StreamResult, *, payload: dict | None = None) -> None:
+    elapsed = time.monotonic() - started
+    logger.info("LLM %s: %.2fs, answer=%d chars, reasoning=%d chars, finish=%s",
+                config.stage, elapsed, len(result.content), result.reasoning_chars,
+                result.finish_reason)
+    if config.telemetry_path is not None:
+        record = {"stage": config.stage, "attempt": attempt, "seconds": elapsed,
+                  "thinking": thinking, "answer_chars": len(result.content),
+                  "reasoning_chars": result.reasoning_chars,
+                  "finish_reason": result.finish_reason,
+                  "usage": result.usage, "timings": result.timings}
+        if payload is not None:
+            safe_keys = ("model", "max_tokens", "reasoning_budget_tokens", "thinking_budget_tokens",
+                         "reasoning_effort", "temperature", "top_p", "top_k", "min_p", "seed", "stream")
+            record["request_settings"] = {key: payload[key] for key in safe_keys if key in payload}
+            kwargs = payload.get("chat_template_kwargs") or {}
+            if "enable_thinking" in kwargs:
+                record["request_settings"]["enable_thinking"] = kwargs["enable_thinking"]
+        try:
+            config.telemetry_path.parent.mkdir(parents=True, exist_ok=True)
+            with config.telemetry_path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except OSError as exc:
+            logger.warning("Could not record LLM metrics: %s", exc)
 
 
 # ── Response parsing ─────────────────────────────────────────────────
@@ -738,20 +816,22 @@ def _translate_blocks(
     return [""] * expected
 
 
-def make_snapshot(target: Path, tag: str) -> Path:
+def make_snapshot(target: Path, tag: str, *, directory: Path | None = None) -> Path:
     """Snapshot `target` as <stem>.<tag><suffix> before a pass overwrites it.
 
     The FIRST snapshot wins: proofread and review overwrite their own input,
     so a second run over the same file must keep the original copy rather
     than replacing it with already-modified text.
 
+    An optional directory keeps review snapshots outside organized final/ files.
     Raises OSError if the snapshot cannot be taken — callers abort instead of
     overwriting what is then the only copy of the translation.
     """
-    snapshot = target.with_name(f"{target.stem}.{tag}{target.suffix}")
+    snapshot = (directory if directory is not None else target.parent) / f"{target.stem}.{tag}{target.suffix}"
     if snapshot.exists():
         logger.info("Snapshot already exists, keeping the original: %s", snapshot)
         return snapshot
+    snapshot.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(target, snapshot)
     logger.info("Snapshot: %s", snapshot)
     return snapshot

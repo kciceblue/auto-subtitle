@@ -65,6 +65,7 @@ class ScriptAnchor:
     script_text: str          # matched script sentence(s), cleaned
     similarity: float         # best Dice score
     status: str               # "high" | "mismatch" | "none"
+    orthographic_conflict: bool = False
 
 
 # ── cleaning ────────────────────────────────────────────────────────────────
@@ -212,7 +213,12 @@ def align_script(
                 status = "mismatch"
         else:
             status = "high"
-        anchors.append(ScriptAnchor(sent, score, status))
+        # An aligned reading is not evidence that the selected kanji are right.
+        source_kanji = re.findall(r"[一-鿿]", line)
+        script_kanji = re.findall(r"[一-鿿]", sent)
+        orthographic = bool(exact and source_kanji and script_kanji
+                            and source_kanji != script_kanji)
+        anchors.append(ScriptAnchor(sent, score, status, orthographic))
         prev = idx + span - 1
     return anchors
 

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "model": "gemma4-31b-qat-q4",
+  "weights": "../models/gemma4-31b-qat-q4/gemma-4-31B_q4_0-it.gguf",
+  "sha256": "179cfb99212709597eae5929112cfca677e1bbf566178b479ae1da0c4772874b",
+  "server_binary": "/home/kciceblue/HF/llama.cpp/out/bin/llama-server",
+  "context_size": 32768,
+  "sampler": {
+    "temperature": 1,
+    "top_p": 0.95,
+    "top_k": 64,
+    "repeat_penalty": 1,
+    "seed": 20260913
+  },
+  "admin_url": "http://127.0.0.1:8089/admin",
+  "restore_model": "qwen3.8-27b-dflash"
+}

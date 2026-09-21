@@ -1,4 +1,4 @@
-faster-whisper>=1.1.0
+faster-whisper>=1.2.1
 demucs>=4.0.0
 torch>=2.0.0
 # torchaudio>=2.9 saves audio through torchcodec; demucs' stem writing dies
@@ -9,3 +9,14 @@ torchcodec==0.10.*
 nvidia-npp-cu12
 requests>=2.28.0
 pypdf>=3.0.0
+
+# Independent ASR and Japanese word alignment used by the default workflow.
+qwen-asr==0.0.6
+sherpa-onnx>=1.13.6
+pykakasi>=2.3.0
+
+# Complete Japanese alias/token boundaries for optional name/source guards.
+Janome>=0.5.0
+
+# Local structured revisit response validation
+jsonschema>=4,<5

@@ -1,0 +1,14 @@
+{
+  "failure": "consumer used compact fingerprint where native producer uses evidence_context._hash",
+  "status": "pre_generation_failure",
+  "model_calls": 0,
+  "native_request_registered": false,
+  "failed_local_seconds": 0.3209794379945379,
+  "failed_state_path": "/home/kciceblue/HF/auto-subtitle/output/quality-masked-source-draft-20260916/screen.json",
+  "failed_state_sha256": "351340d2d82a1e0f9bedc96d835b298107e5aa5bfa8fa377270881f3ca000343",
+  "saved_files": {
+    "design/am-g1-preparation-hash-failure-20260916/masked_source_screen.py": "7d39c12b144f0be3ce0b96dcef625aebf042b8c4c2688636b76f4d02fe1fdf73",
+    "design/am-g1-preparation-hash-failure-20260916/test_masked_source_screen.py": "3aceb0e0f0a0e4d59b2a59abb39ac510fbdc3babe3bcbbd02f934bed841a23b1",
+    "design/am-g1-preparation-hash-failure-20260916/masked_source_draft_requests.py": "105db1c1c08e065992be5711809062e14ef5722d41b28b2fcc71a6c257f419ad"
+  }
+}

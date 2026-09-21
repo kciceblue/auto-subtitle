@@ -50,6 +50,7 @@ def main(spec: dict) -> int:
         keep_temp=spec["keep_temp"],
         verbose=spec["verbose"],
         hotwords=spec.get("hotwords") or [],
+        hotword_mode=spec.get("hotword_mode", "model"),
         warden_admin_url=spec["warden_admin_url"],
         unload_warden_before_asr=spec["unload_warden_before_asr"],
     )

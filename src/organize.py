@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 FINAL_DIR = "final"
 REVIEW_DIR = "review"
 
-_SNAPSHOT_RE = re.compile(r"\.pre-(proofread|review)\.srt$")
+_SNAPSHOT_RE = re.compile(r"\.pre-(proofread|review|asr)\.srt$")
 
 
 def _is_snapshot(path: Path) -> bool:
@@ -55,7 +55,7 @@ def _is_final(path: Path) -> bool:
     """final/ = media + every non-snapshot .srt (source and translated)."""
     if _is_media(path):
         return True
-    return path.suffix.lower() == ".srt" and not _is_snapshot(path)
+    return path.suffix.lower() == ".srt" and not _is_snapshot(path) and ".utterances" not in path.name
 
 
 def _unit_files(
@@ -118,6 +118,7 @@ def _has_translation(
             name.endswith(".srt")
             and name.startswith(prefix)
             and name != source_name
+            and ".utterances" not in name
             and not _SNAPSHOT_RE.search(name)
         )
 
@@ -137,7 +138,7 @@ def _has_source_srt(
     """A source ``<stem>.srt`` for media in ``rel_dir`` exists somewhere."""
     name = stem + ".srt"
     for _p, rel in files:
-        if rel.parent == rel_dir and rel.name == name:
+        if rel.parent == rel_dir and rel.name in {name, stem + ".utterances.srt"}:
             return True
     if final_root.is_dir():
         candidate = final_root / rel_dir / name

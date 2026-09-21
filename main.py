@@ -86,6 +86,10 @@ def add_transcribe_args(parser: argparse.ArgumentParser) -> None:
              "Merged with LLM-generated hotwords before ASR.",
     )
     parser.add_argument(
+        "--hotword-mode", choices=("model", "explicit", "none"), default="model",
+        help="ASR hotwords: model extraction (default), explicit vocabulary terms, or none (translation context is retained).",
+    )
+    parser.add_argument(
         "--context",
         type=Path,
         action="append",
@@ -314,6 +318,50 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_transcribe_args(sub_pipeline)
     add_translate_args(sub_pipeline, positional=False)
+    sub_pipeline.add_argument("--evidence-first", action="store_true",
+                              help="Batch audio evidence before scene translation and selective QA")
+    sub_pipeline.add_argument("--arbitrate", action="store_true",
+                              help="Collect all-cue three-model evidence before translation")
+    sub_pipeline.add_argument("--organize", action="store_true",
+                              help="Organize only completed work units (evidence-first workflow)")
+    sub_pipeline.add_argument("--asr-strategy", choices=("ensemble", "sequential"), default="ensemble",
+                              help="Independent concurrent ASR (default) or original sequential arbitration")
+    sub_pipeline.add_argument("--ensemble-source", choices=("consensus", "qwen", "nemo"), default="consensus",
+                              help="Ensemble source: consensus (default), original Qwen, or experimental Japanese NeMo preference")
+    sub_pipeline.add_argument("--nemo-model", type=Path, help="Local ReazonSpeech NeMo archive (NeMo source only)")
+    sub_pipeline.add_argument("--nemo-python", type=Path, help="Python executable inside an isolated NeMo environment")
+    sub_pipeline.add_argument("--qwen-asr-hotwords", action=argparse.BooleanOptionalAction, default=True,
+                              help="Pass hotwords as Qwen-ASR context (default: enabled; ensemble only)")
+    sub_pipeline.add_argument("--asr-window-seconds", type=float, default=20.0,
+                              help="Experimental ensemble core duration (8–28s); default20s, plus0.8s context per edge")
+    sub_pipeline.add_argument("--asr-batch-size", type=int, default=8,
+                              help="Qwen-ASR clip batch size (default: 8)")
+    sub_pipeline.add_argument("--scene-max-chars", type=int, default=2400,
+                              help="Maximum source characters per scene request (default: 2400)")
+    sub_pipeline.add_argument("--coherence-polish", action=argparse.BooleanOptionalAction, default=False,
+                              help="Run a local document-context Chinese edit pass before display; independent coherence scoring remains required")
+    sub_pipeline.add_argument("--coherence-recipe", type=Path,
+                              help="JSON recipe for local model switching and evidence/critic editing before display (evidence-first only)")
+    sub_pipeline.add_argument("--translation-episode-context", action=argparse.BooleanOptionalAction, default=False,
+                              help="Use complete chosen-source episode context for first-draft translation only (experimental; evidence-first, 32KiB source JSON limit)")
+    sub_pipeline.add_argument("--translation-reasoning-budget", type=int, choices=(0, 256, 512), default=0,
+                              help="First-draft local Qwen thinking cap per block (0/off default); total output stays bounded by --max-tokens, evidence-first only")
+    sub_pipeline.add_argument("--delta-verification", action=argparse.BooleanOptionalAction, default=False,
+                              help="Verify repairs as before/after transactions (local QA, experimental)")
+    sub_pipeline.add_argument("--source-pause-units", action=argparse.BooleanOptionalAction, default=False,
+                              help="Split source units at supported pauses before translation (experimental; automatic ensemble ASR only)")
+    sub_pipeline.add_argument("--pause-layout", action=argparse.BooleanOptionalAction, default=False,
+                              help="Partition display text at supported long pauses (experimental)")
+    sub_pipeline.add_argument("--source-span-repair", action=argparse.BooleanOptionalAction, default=False,
+                              help="Select bounded raw-ASR word alternatives and realign changed source (experimental)")
+    sub_pipeline.add_argument("--entity-placeholders", action=argparse.BooleanOptionalAction, default=False,
+                              help="Protect grounded name occurrences during local translation (experimental)")
+    sub_pipeline.add_argument("--structured-translation", action=argparse.BooleanOptionalAction, default=False,
+                              help="Constrain draft translations to exact request-local JSON IDs")
+    sub_pipeline.add_argument("--structured-qa", action=argparse.BooleanOptionalAction, default=False,
+                              help="Experimental local llama.cpp JSON-schema diagnosis/verification (default: disabled)")
+    sub_pipeline.add_argument("--force", action="store_true",
+                              help="Recompute cached workflow stages and requests")
 
     # review (review-only entry; the unified runner uses this after the
     # arbitration subprocess so FTDC evidence exists before DeepFix runs)
@@ -375,6 +423,20 @@ def build_parser() -> argparse.ArgumentParser:
         "-v", "--verbose", action="store_true", help="Enable debug logging",
     )
 
+    sub_release = subparsers.add_parser("release", help="Prepare, check or package an independently validated release")
+    sub_release.add_argument("unit_dir", type=Path, help="Organized work folder under output/ or ready_for_human_review/")
+    sub_release.add_argument("--assessment", type=Path, help="Independent assessment JSON; defaults to review/release-assessment.json")
+    action = sub_release.add_mutually_exclusive_group()
+    action.add_argument("--prepare", action="store_true", help="Create an unapproved assessment template; do not release")
+    action.add_argument("--check", action="store_true", help="Validate the assessment without creating a release")
+    sub_release.add_argument("--writer-model",
+                             help="Actual local writer alias, for --prepare only; defaults to DFlash")
+    sub_release.add_argument("--scope", choices=("source_verified", "target_coherence", "contextual_subtitles"),
+                             default="source_verified",
+                             help="Source-verified release (six), contextual subtitles (v4 four), or historical target coherence (v3; milestones are prepare/check only)")
+    sub_release.add_argument("--destination", type=Path, default=Path("released"))
+    sub_release.add_argument("-v", "--verbose", action="store_true")
+
     return parser
 
 
@@ -434,6 +496,15 @@ def _check_input_paths(args: argparse.Namespace) -> list[str]:
     return _missing_paths(candidates)
 
 
+def _deterministic_hotword_result(args: argparse.Namespace):
+    """Handle explicit/disabled hotwords before context scanning or model work."""
+    if args.hotword_mode == "model":
+        return None
+    from src.hotwords import generate_hotwords
+    return generate_hotwords(vocab_file=args.vocab, hotwords_file=args.hotwords_file,
+                             source_lang=getattr(args, "source_lang", "Japanese"), mode=args.hotword_mode)
+
+
 def cmd_transcribe(args: argparse.Namespace) -> int:
     from src.config import TranscribeConfig
     from src.hotwords import generate_hotwords
@@ -445,6 +516,12 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
             logger.error("File not found — %s", entry)
         return 1
 
+    try:
+        deterministic_hotwords = _deterministic_hotword_result(args)
+    except (ValueError, OSError) as exc:
+        logger.error("Invalid ASR hotwords: %s", exc)
+        return 1
+
     # Hotword generation: context (content-aware scan or --context) + vocab
     from src.context_scan import classify_explicit, scan_context_files
     from src.hotwords import DEFAULT_ENDPOINT
@@ -454,7 +531,9 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
     scan_endpoint = args.hotword_endpoint or DEFAULT_ENDPOINT
     context_kinds: dict[str, str] = {}
     context_files: list[Path] = list(args.context or [])
-    if context_files:
+    if deterministic_hotwords is not None:
+        pass  # Transcribe-only deterministic modes need no model context classification.
+    elif context_files:
         explicit = classify_explicit(
             context_files, scan_endpoint, scan_payload,
             source_lang=getattr(args, "source_lang", "Japanese"),
@@ -503,6 +582,7 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
         context_files=context_files,
         context_kinds=context_kinds,
         hotwords_file=args.hotwords_file,
+        hotword_mode=args.hotword_mode,
         hotword_endpoint=args.hotword_endpoint or getattr(args, "endpoint", None),
         hotword_extra_payload=(
             json.loads(extra_payload) if extra_payload else None
@@ -511,7 +591,7 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
         unload_warden_before_asr=not args.no_warden_unload,
     )
 
-    if context_files or args.hotwords_file or args.vocab:
+    if deterministic_hotwords is not None or context_files or args.hotwords_file or args.vocab:
         # Media title (filename) is itself context: 8/30 lesson — a work run
         # without context produced 31% 存疑; the title alone would anchor
         # the domain terms that plain ASR garbled.
@@ -519,7 +599,7 @@ def cmd_transcribe(args: argparse.Namespace) -> int:
         title = _collect_titles(media_list)
         if title:
             logger.info("Media title as hotword context: %s", title)
-        result = generate_hotwords(
+        result = deterministic_hotwords or generate_hotwords(
             context_files=config.context_files,
             # --vocab is the file that actually carries the user's 误->正
             # corrections; --hotwords-file is the fallback alias.
@@ -818,6 +898,52 @@ def cmd_archive(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+def cmd_release(args: argparse.Namespace) -> int:
+    from src.release import (WRITER_MODEL, prepare_assessment, release_unit,
+                             validate_assessment, validate_coherence_assessment, coherence_warnings)
+    from src.workflow_state import read_json
+    unit = args.unit_dir
+    assessment = args.assessment or unit / "review" / "release-assessment.json"
+    try:
+        writer_model = getattr(args, "writer_model", None)
+        scope = getattr(args, "scope", "source_verified")
+        if writer_model is not None and not args.prepare:
+            raise ValueError("--writer-model is only for preparing a new assessment; preserve existing review records")
+        if args.prepare:
+            if scope == "contextual_subtitles":
+                from src.contextual_release import prepare_assessment as prepare_contextual
+                if writer_model is None:
+                    raise ValueError("Contextual preparation requires --writer-model with the actual local writer")
+                record = prepare_contextual(unit, assessment, writer_model=writer_model)
+            else:
+                record = prepare_assessment(unit, assessment, writer_model=WRITER_MODEL if writer_model is None else writer_model, assessment_scope=scope)
+            logger.info("Unapproved assessment prepared: %s (%d automatic findings)", assessment, len(record["automatic_findings"]))
+        elif args.check:
+            if scope == "contextual_subtitles":
+                from src.contextual_release import validate_assessment as validator
+            else:
+                validator = validate_coherence_assessment if scope == "target_coherence" else validate_assessment
+            errors = validator(unit, read_json(assessment))
+            if errors:
+                for error in errors:
+                    logger.error("Release blocked: %s", error)
+                return 1
+            if scope in ("target_coherence", "contextual_subtitles"):
+                for finding in coherence_warnings(unit):
+                    logger.warning("Timing requires separate review: %s", finding)
+                logger.info("Independent %s milestone passes for %s; source fidelity is not certified and playback is not verified", scope, unit)
+            else:
+                logger.info("Independent release assessment passes for %s", unit)
+        else:
+            if scope != "source_verified":
+                raise ValueError("A score-four milestone cannot authorize packaging; a source-verified release assessment is required")
+            logger.info("Released: %s", release_unit(unit, assessment, args.destination))
+    except (ValueError, OSError) as exc:
+        logger.error("Release blocked: %s", exc)
+        return 1
+    return 0
+
+
 def _move_input_to_output(input_dir: Path, output_dir: Path) -> None:
     """Move all files from input_dir to output_dir, preserving structure.
 
@@ -863,6 +989,20 @@ def _move_input_to_output(input_dir: Path, output_dir: Path) -> None:
 
 
 def cmd_pipeline(args: argparse.Namespace) -> int:
+    if not args.evidence_first and any((args.nemo_model is not None, args.nemo_python is not None, args.coherence_polish, args.coherence_recipe is not None, args.structured_translation, args.translation_episode_context, args.translation_reasoning_budget, args.source_pause_units, args.pause_layout, args.source_span_repair, args.entity_placeholders,
+                                        args.delta_verification, args.structured_qa)):
+        logger.error("Experimental translation/source/entity/QA controls require --evidence-first")
+        return 1
+    if not args.evidence_first and (args.ensemble_source != "consensus" or not args.qwen_asr_hotwords or args.asr_window_seconds != 20.0):
+        logger.error("Ensemble source/context controls require --evidence-first with ensemble arbitration")
+        return 1
+    if args.evidence_first:
+        from src.workflow import run_workflow
+        try:
+            return run_workflow(args)
+        except (ValueError, OSError, RuntimeError) as exc:
+            logger.error("Evidence-first workflow failed: %s", exc)
+            return 1
     from src.config import TranscribeConfig, TranslateConfig, MEDIA_EXTENSIONS
     from src.hotwords import generate_hotwords
     from src.translate import AllChunksFailedError, translate_srt
@@ -876,6 +1016,12 @@ def cmd_pipeline(args: argparse.Namespace) -> int:
     if missing:
         for entry in missing:
             logger.error("File not found — %s", entry)
+        return 1
+
+    try:
+        deterministic_hotwords = _deterministic_hotword_result(args)
+    except (ValueError, OSError) as exc:
+        logger.error("Invalid ASR hotwords: %s", exc)
         return 1
 
     input_dir = Path("input")
@@ -964,13 +1110,14 @@ def cmd_pipeline(args: argparse.Namespace) -> int:
         context_files=context_files,
         context_kinds=context_kinds,
         hotwords_file=args.hotwords_file,
+        hotword_mode=args.hotword_mode,
         hotword_endpoint=args.hotword_endpoint or args.endpoint,
         hotword_extra_payload=extra,
         warden_admin_url=args.warden_admin,
         unload_warden_before_asr=not args.no_warden_unload,
     )
 
-    if context_files or args.hotwords_file or args.vocab:
+    if deterministic_hotwords is not None or context_files or args.hotwords_file or args.vocab:
         # Media title (filename) is itself context — same wiring as
         # cmd_transcribe. 8/30: this was missing here, so pipeline runs
         # over context-less folders transcribe with ZERO hotwords (the
@@ -978,7 +1125,7 @@ def cmd_pipeline(args: argparse.Namespace) -> int:
         title = _collect_titles(media_files)
         if title:
             logger.info("Media title as hotword context: %s", title)
-        result = generate_hotwords(
+        result = deterministic_hotwords or generate_hotwords(
             context_files=transcribe_config.context_files,
             # --vocab is the file that actually carries the user's 误->正
             # corrections; --hotwords-file is the fallback alias.
@@ -1123,6 +1270,8 @@ def main() -> int:
         return cmd_organize(args)
     elif args.command == "archive":
         return cmd_archive(args)
+    elif args.command == "release":
+        return cmd_release(args)
     else:
         parser.print_help()
         return 1

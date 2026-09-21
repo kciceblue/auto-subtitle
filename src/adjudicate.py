@@ -95,6 +95,14 @@ def kana_normalize(text: str) -> str:
 
 def load_full_wav(media: Path) -> tuple[int, np.ndarray]:
     """媒体 → 16kHz mono float32（一次 ffmpeg，内存切片）。"""
+    if media.suffix.lower() == ".wav":
+        try:
+            with wave.open(str(media), "rb") as stream:
+                if stream.getframerate() == 16000 and stream.getnchannels() == 1 and stream.getsampwidth() == 2:
+                    audio = np.frombuffer(stream.readframes(stream.getnframes()), dtype=np.int16)
+                    return 16000, audio.astype(np.float32) / 32768.0
+        except (wave.Error, EOFError):
+            pass  # A WAV extension does not guarantee PCM16; ffmpeg handles it.
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         wav_path = Path(f.name)
     try:
@@ -122,16 +130,20 @@ def _slice(sr: int, full: np.ndarray, start: float, end: float) -> np.ndarray:
 class ZipformerN:
     """N: zipformer-ja-reazonspeech（CPU，电视节目先验）。"""
 
-    def __init__(self, model_dir: Path = ZIPFORMER_DIR, num_threads: int = 8):
+    def __init__(self, model_dir: Path = ZIPFORMER_DIR, num_threads: int = 8,
+                 decoder_precision: str = "int8"):
         import sherpa_onnx
+        if decoder_precision not in {"int8", "fp32"}:
+            raise ValueError("decoder_precision must be int8 or fp32")
+        decoder = "decoder-epoch-99-avg-1" + (".int8" if decoder_precision == "int8" else "") + ".onnx"
         self._rec = sherpa_onnx.OfflineRecognizer.from_transducer(
             encoder=str(model_dir / "encoder-epoch-99-avg-1.int8.onnx"),
-            decoder=str(model_dir / "decoder-epoch-99-avg-1.int8.onnx"),
+            decoder=str(model_dir / decoder),
             joiner=str(model_dir / "joiner-epoch-99-avg-1.int8.onnx"),
             tokens=str(model_dir / "tokens.txt"),
             num_threads=num_threads,
         )
-        logger.info("zipformer-N loaded (CPU)")
+        logger.info("zipformer-N loaded (CPU, %s decoder)", decoder_precision)
 
     def transcribe(self, sr: int, audio: np.ndarray) -> str:
         if len(audio) < sr * 1.0:
@@ -145,7 +157,9 @@ class ZipformerN:
 class Qwen3Q:
     """Q: qwen3-asr-1.7b（GPU，LLM 架构补完式）。"""
 
-    def __init__(self, model_dir: Path = QWEN3_DIR):
+    def __init__(self, model_dir: Path = QWEN3_DIR, *,
+                 warden_admin_url: str = "http://127.0.0.1:8089/admin",
+                 unload_warden: bool = True, compute_type: str = "float16"):
         import torch
         from src.warden import (
             ADJUDICATE_Q_HARD_FLOOR_GB,
@@ -161,22 +175,35 @@ class Qwen3Q:
             required_gb=ADJUDICATE_Q_MIN_FREE_GB,
             hard_floor_gb=ADJUDICATE_Q_HARD_FLOOR_GB,
             caller="audio arbitration (qwen3-asr)",
+            admin_url=warden_admin_url, enabled=unload_warden,
         )
         from qwen_asr import Qwen3ASRModel
         self._torch = torch
         self._asr = Qwen3ASRModel.from_pretrained(
-            str(model_dir), dtype=torch.float16, device_map="cuda")
+            str(model_dir), dtype=getattr(torch, compute_type), device_map="cuda")
         logger.info("qwen3-Q loaded (GPU)")
 
-    def transcribe(self, sr: int, audio: np.ndarray) -> str:
+    def transcribe(self, sr: int, audio: np.ndarray, context: str = "") -> str:
         if len(audio) < sr * 1.0:
             return ""
         try:
-            out = self._asr.transcribe((audio, sr), language="Japanese")
+            out = self._asr.transcribe((audio, sr), language="Japanese", context=context)
             return out[0].text.strip() if out else ""
         except Exception as e:
             logger.warning("qwen3 transcribe error: %s", e)
             return ""
+
+    def transcribe_batch(self, sr: int, audios: list[np.ndarray], context: str = "") -> list[str]:
+        if not audios:
+            return []
+        try:
+            out = self._asr.transcribe([(audio, sr) for audio in audios], language="Japanese", context=context)
+            if len(out) != len(audios):
+                raise ValueError("Qwen-ASR batch length mismatch")
+            return [item.text.strip() for item in out]
+        except Exception as exc:
+            logger.warning("Qwen-ASR batch failed; trying individual clips: %s", exc)
+            return [self.transcribe(sr, audio, context=context) for audio in audios]
 
 
 # ── 投票分级（v1.3 读音层逻辑）──────────────────────────────────────
@@ -184,8 +211,8 @@ class Qwen3Q:
 def grade_vote(w: str, n: str, q: str, kana_w: str, kana_n: str, kana_q: str) -> tuple[str, str]:
     """返回 (grade, note)。"""
     kw, kn, kq = kana_w, kana_n, kana_q
-    if not n and not q:
-        return "D", "第二/三模型不可用"
+    if not n or not q:
+        return "D", "第二或第三模型不可用，不能当作三方投票"
     if kw and kw == kn == kq:
         if w == n == q:
             return "A", "三模型一致"
@@ -208,6 +235,7 @@ def adjudicate(
     out_json: Path,
     use_q: bool = True,
     max_workers_note: str = "",
+    *, n_model=None, q_model=None, batch_size: int = 8,
 ) -> Path:
     """对可疑行做三模型复听，写 adjudication.json。
 
@@ -237,9 +265,8 @@ def adjudicate(
     logger.info("Audio loaded: %.1f min (%.1fs)", len(full) / sr / 60, time.monotonic() - t0)
 
     # N（CPU）常驻
-    n_model = ZipformerN()
-    # Q（GPU）可选
-    q_model = Qwen3Q() if use_q else None
+    n_model = n_model if n_model is not None else ZipformerN()
+    q_model = (q_model if q_model is not None else Qwen3Q()) if use_q else None
 
     # Clip to real line numbers up front ("all" arrives as 1..99999) so the
     # progress denominator reflects actual work.
@@ -247,33 +274,36 @@ def adjudicate(
 
     results: list[Adjudication] = []
     t_all = time.monotonic()
-    for i, ln in enumerate(suspicious):
+    pending = []
+    for ln in suspicious:
         b = blocks[ln - 1]
         a, bb = b.ts_line.split("-->")
         start, end = ts_sec(a.strip()), ts_sec(bb.strip())
-        if end - start < 0.3:
-            continue
         audio = _slice(sr, full, start, end)
         ad = Adjudication(line=ln, w=b.text.strip())
-        ad.n = n_model.transcribe(sr, audio)
-        if q_model is not None:
-            ad.q = q_model.transcribe(sr, audio)
-        if not ad.n and not ad.q:
-            ad.grade, ad.note = "D", "复听无输出"
+        results.append(ad)
+        if len(audio) < sr:
+            ad.note = "切片不足1秒，证据不足，需邻域复听"
+        elif not np.any(audio):
+            ad.note = "数字静音，无声学证据；不能将识别器幻觉当作共识"
         else:
+            pending.append((audio, ad))
+    # Duration buckets reduce padding work; results retain original cue IDs/order.
+    pending.sort(key=lambda item: len(item[0]))
+    for offset in range(0, len(pending), max(1, batch_size)):
+        batch = pending[offset:offset + max(1, batch_size)]
+        q_texts = q_model.transcribe_batch(sr, [a for a, _ in batch]) if q_model else [""] * len(batch)
+        for (audio, ad), q_text in zip(batch, q_texts):
+            ad.n = n_model.transcribe(sr, audio)
+            ad.q = q_text
             ad.kana_w = kana_normalize(ad.w)
             ad.kana_n = kana_normalize(ad.n)
             ad.kana_q = kana_normalize(ad.q)
             ad.grade, ad.note = grade_vote(ad.w, ad.n, ad.q, ad.kana_w, ad.kana_n, ad.kana_q)
-        results.append(ad)
-        if (i + 1) % 50 == 0:
-            logger.info("Adjudicated %d/%d (%.0fs)",
-                        i + 1, len(suspicious), time.monotonic() - t_all)
-
-    out_json.parent.mkdir(parents=True, exist_ok=True)
-    out_json.write_text(
-        json.dumps([r.to_dict() for r in results], ensure_ascii=False, indent=1),
-        encoding="utf-8")
+        logger.info("Adjudicated %d/%d (%.0fs)", min(offset + len(batch), len(pending)),
+                    len(pending), time.monotonic() - t_all)
+    from src.workflow_state import write_json
+    write_json(out_json, [r.to_dict() for r in results])
 
     grades: dict[str, int] = {}
     for r in results:
@@ -284,9 +314,34 @@ def adjudicate(
     return out_json
 
 
+def adjudicate_batch(manifest: Path) -> int:
+    """Reuse both models across tracks, then return all GPU memory on exit."""
+    from src.workflow_state import StageState, read_json
+    spec = read_json(manifest)
+    n_model = ZipformerN()
+    q_model = Qwen3Q(warden_admin_url=spec["warden_admin"], unload_warden=spec["unload_warden"])
+    failed = 0
+    for job in spec["jobs"]:
+        state = StageState(Path(job["state"]))
+        started = time.monotonic()
+        try:
+            adjudicate(Path(job["source"]), Path(job["media"]),
+                       list(range(1, job["cues"] + 1)), Path(job["out"]),
+                       n_model=n_model, q_model=q_model, batch_size=spec["batch_size"])
+            state.save("arbitration", job["key"], [Path(job["out"])], seconds=time.monotonic() - started)
+        except Exception as exc:
+            logger.exception("Arbitration failed for %s", job["media"])
+            state.save("arbitration", job["key"], [], status="failed", error=str(exc))
+            failed += 1
+    return int(failed > 0)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     import argparse
+    import sys
+    if len(sys.argv) == 3 and sys.argv[1] == "--batch":
+        sys.exit(adjudicate_batch(Path(sys.argv[2])))
 
     p = argparse.ArgumentParser()
     p.add_argument("--srt", required=True, type=Path)

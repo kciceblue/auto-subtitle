@@ -25,6 +25,9 @@ class Segment:
     start: float
     end: float
     text: str
+    avg_logprob: float | None = None
+    no_speech_prob: float | None = None
+    compression_ratio: float | None = None
 
 
 def load_model(config: TranscribeConfig) -> WhisperModel:
@@ -105,7 +108,9 @@ def transcribe(model: WhisperModel, audio_path: Path, config: TranscribeConfig) 
         text = seg.text.strip()
         if not text:
             continue
-        segments.append(Segment(index=i, start=seg.start, end=seg.end, text=text))
+        segments.append(Segment(index=i, start=seg.start, end=seg.end, text=text,
+                                avg_logprob=seg.avg_logprob, no_speech_prob=seg.no_speech_prob,
+                                compression_ratio=seg.compression_ratio))
         if config.verbose:
             logger.debug("[%.2fs → %.2fs] %s", seg.start, seg.end, text)
 

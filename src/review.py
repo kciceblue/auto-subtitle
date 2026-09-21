@@ -572,8 +572,8 @@ def critic_pass(
             for note in script_notes[ln]:
                 parts.append(f"#行{ln}: {note}")
         instruction += (
-            "\n=== 台本参照（台词原稿，最高可信度，优先于全局语境与音频候选；"
-            "只用于理解该行真实台词，不要输出本节）===\n"
+            "\n=== 常驻证据（保留音频/台本/标题的来源与冲突标记；"
+            "不能凭全局总结推翻有依据的修正，不要输出本节）===\n"
             + "\n".join(parts)
             + "\n=== 台本参照结束 ===\n"
         )
@@ -1014,10 +1014,10 @@ def _triage(
             sus.add(ln)
     if script_anchors:
         for ln, a in enumerate(script_anchors, start=1):
-            if a.status != "mismatch":
+            if a.status != "mismatch" and not a.orthographic_conflict:
                 continue
             adj = adj_by_line.get(ln)
-            if adj and adj.get("grade") == "A":
+            if adj and adj.get("grade") == "A" and a.status == "mismatch":
                 # 台本与音频三模型一致冲突：台本可能是别的版本/含未说出口的
                 # 台词，不自动改 —— 报告交人工。从任何来源的可疑集合中移除
                 # （global suspects / 规则 / 音频信号），防止 DeepFix 借台本
@@ -1116,16 +1116,16 @@ def review_srt(
         for ln, a in adj_by_line.items():
             g = a.get("grade")
             if g in ("B+", "B-") and a.get("note"):
-                cand = a.get("n") or a.get("q") or ""
-                notes[ln] = [f"音频复听[{g}]: {a['note']}" +
-                             (f"（候选: {cand[:40]}）" if cand else "")]
+                notes[ln] = [f"音频复听[{g}]: {a['note']}；"
+                             f"W={a.get('w') or source[ln - 1].text}；"
+                             f"N={a.get('n') or '(无输出)'}；Q={a.get('q') or '(无输出)'}"]
         # 台本证据注入（mismatch 行：台本是原稿，优先级高于音频候选）
         # script_notes 同时供 critic_pass 与 R2+ 重校使用，防止台本证据
         # 在后续轮次丢失（global 语境可能基于 ASR 错字，把错词当角色名）。
         script_notes: dict[int, list[str]] = {}
         if script_anchors:
             for ln, a in enumerate(script_anchors, start=1):
-                if a.status == "mismatch":
+                if a.status == "mismatch" or a.orthographic_conflict:
                     note = (f"台本参照（最高可信度，优先于音频候选）: {a.script_text[:60]}"
                             f"（相似度 {a.similarity:.2f}，与源文不符——按台本修正）")
                     script_notes[ln] = [note]
@@ -1216,7 +1216,7 @@ def review_srt(
             critic = critic_pass(
                 source, translated, profile, config, f"Critic-{round_label}",
                 focus=sorted(critic_focus),
-                script_notes=script_notes,
+                script_notes=notes,
             )
             critic.excluded = sorted(ln for ln in critic.comments if ln in unfixable)
             timeline.append(critic)
@@ -1252,7 +1252,7 @@ def review_srt(
             )
             # 台本证据常驻重校轮次：critic 意见 + 台本参照（防止 ping-pong）
             merged_notes = {
-                ln: list(actionable.get(ln, [])) + script_notes.get(ln, [])
+                ln: list(actionable.get(ln, [])) + notes.get(ln, [])
                 for ln in actionable
             }
             rnd = _run_round(

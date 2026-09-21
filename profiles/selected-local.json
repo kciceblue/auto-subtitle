@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "asr_model_dir": "../models/anime-whisper",
+  "writer_recipe": "selected-writer.json"
+}

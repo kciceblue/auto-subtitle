@@ -72,7 +72,7 @@ Generate the ASR hotword list now (one per line, at most {max_hotwords}).
 @dataclass
 class HotwordResult:
     hotwords: list[str]
-    source: str  # "cache" | "llm" | "vocab-only" | "none"
+    source: str  # "cache" | "llm" | "vocab-only" | "explicit" | "disabled" | "none"
     cache_key: str | None = None
 
 
@@ -198,6 +198,25 @@ def _merge_vocab(vocab: list[str]) -> list[str]:
     return result
 
 
+def read_explicit_hotwords(paths: list[Path]) -> list[str]:
+    """Read only supplied terms; correction LHS and context cannot introduce words."""
+    words, seen = [], set()
+    for path in dict.fromkeys(Path(p) for p in paths):
+        for line in path.read_text(encoding="utf-8-sig").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            word = line.rsplit("->", 1)[-1].strip()
+            if word and word.casefold() not in seen:
+                seen.add(word.casefold())
+                words.append(word)
+    if not words:
+        raise ValueError("--hotword-mode explicit requires usable terms in --vocab or --hotwords-file")
+    if len(words) > MAX_HOTWORDS:
+        logger.warning("Explicit hotwords capped at the first %d of %d unique terms", MAX_HOTWORDS, len(words))
+    return words[:MAX_HOTWORDS]
+
+
 def generate_hotwords(
     context_files: list[Path] | None = None,
     vocab_file: Path | None = None,
@@ -207,10 +226,14 @@ def generate_hotwords(
     cache_file: Path | None = None,
     force: bool = False,
     title: str | None = None,
+    mode: str = "model",
+    hotwords_file: Path | None = None,
 ) -> HotwordResult:
     """Generate the final ASR hotword list.
 
     Args:
+        mode: "model" extracts terms, "explicit" reads supplied files, "none" disables bias.
+        hotwords_file: additional explicit terms (combined with vocab_file in explicit mode).
         context_files: README/synopsis files to ground hotword extraction in.
         vocab_file: optional vocab file (one term per line, 'A->B' = correction).
         source_lang: e.g. "Japanese" — controls output language of hotwords.
@@ -223,6 +246,21 @@ def generate_hotwords(
             (e.g. 去勢/麻酔) bias ASR decoding — 8/30 lesson: without
             any context, garbled terms stay garbled and cannot be recovered.
     """
+    if mode not in {"model", "explicit", "none"}:
+        raise ValueError(f"Unknown hotword mode: {mode}")
+    if mode == "none":
+        payload = json.dumps(["disabled-hotwords-v1", source_lang])
+        key = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+        logger.info("ASR hotword bias disabled; translation vocabulary/context remains available")
+        return HotwordResult(hotwords=[], source="disabled", cache_key=key)
+    if mode == "explicit":
+        words = read_explicit_hotwords([p for p in (vocab_file, hotwords_file) if p is not None])
+        # Deterministic file parsing is cheaper than a cache lookup and cannot
+        # inherit poisoned generated entries. Never read or write the model cache.
+        payload = json.dumps(["explicit-hotwords-v1", source_lang, words], ensure_ascii=False)
+        key = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+        logger.info("Explicit ASR hotwords (%d): %s", len(words), words)
+        return HotwordResult(hotwords=words, source="explicit", cache_key=key)
     context_files = [p for p in (context_files or []) if p.is_file()]
     vocab: list[str] = []
     if vocab_file is not None and vocab_file.is_file():
@@ -246,6 +284,8 @@ def generate_hotwords(
     for v in vocab_terms:
         h.update(v.encode("utf-8"))
     h.update(source_lang.encode("utf-8"))
+    h.update(json.dumps(extra_payload or {}, sort_keys=True).encode("utf-8"))
+    h.update((endpoint or DEFAULT_ENDPOINT).encode("utf-8"))
     cache_key = h.hexdigest()[:16]
 
     if cache_file is None:
@@ -292,6 +332,7 @@ def generate_hotwords(
     if merged and llm_words is not None:
         cache[cache_key] = merged
         try:
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
             cache_file.write_text(
                 json.dumps(cache, ensure_ascii=False, indent=2),
                 encoding="utf-8",
@@ -307,3 +348,20 @@ def generate_hotwords(
     source = "llm" if (llm_words and merged) else ("vocab-only" if merged else "none")
     logger.info("Hotwords generated (%s, %d words): %s", source, len(merged), merged)
     return HotwordResult(hotwords=merged, source=source, cache_key=cache_key)
+
+
+def filter_asr_hotwords(words: list[str], source_lang: str, vocab: Path | None = None) -> list[str]:
+    """Generated Japanese hotwords need Japanese spelling; explicit user terms survive."""
+    explicit = {line.split('->')[-1].strip() for line in _read_lines(vocab)} if vocab else set()
+    wrong = {line.split('->')[0].strip() for line in _read_lines(vocab) if '->' in line} if vocab else set()
+    result = []
+    for word in words:
+        if word in wrong and word not in explicit:
+            continue
+        if source_lang.lower() in {'ja','japanese'} and word not in explicit and not re.search(r'[\u3040-\u30ff\u4e00-\u9fff]',word):
+            continue
+        if re.fullmatch(r'\d{3,4}[pi]|S\d+E\d+|x26[45]',word,re.I):
+            continue
+        if word not in result:
+            result.append(word)
+    return result

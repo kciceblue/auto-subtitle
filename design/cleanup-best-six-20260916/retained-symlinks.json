@@ -1,0 +1,492 @@
+{
+  "/home/kciceblue/HF/auto-subtitle/.venv/lib64": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib",
+      "device": 66306,
+      "inode": 239206482,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755595205510111,
+      "mode": 16893,
+      "links": 3
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv/bin/python3.12": {
+    "target": "/usr/bin/python3.12",
+    "exists": true,
+    "target_stat": {
+      "path": "/usr/bin/python3.12",
+      "device": 66315,
+      "inode": 134218327,
+      "bytes": 8020928,
+      "allocated_bytes": 8024064,
+      "mtime_ns": 1788171506000000000,
+      "mode": 33261,
+      "links": 1
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv/bin/python3": {
+    "target": "/usr/bin/python3.12",
+    "exists": true,
+    "target_stat": {
+      "path": "/usr/bin/python3.12",
+      "device": 66315,
+      "inode": 134218327,
+      "bytes": 8020928,
+      "allocated_bytes": 8024064,
+      "mtime_ns": 1788171506000000000,
+      "mode": 33261,
+      "links": 1
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv/bin/python": {
+    "target": "/usr/bin/python3.12",
+    "exists": true,
+    "target_stat": {
+      "path": "/usr/bin/python3.12",
+      "device": 66315,
+      "inode": 134218327,
+      "bytes": 8020928,
+      "allocated_bytes": 8024064,
+      "mtime_ns": 1788171506000000000,
+      "mode": 33261,
+      "links": 1
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/lib64": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/lib",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/lib",
+      "device": 66306,
+      "inode": 13114704,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1789504834925387717,
+      "mode": 16893,
+      "links": 3
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/bin/python3.12": {
+    "target": "/usr/bin/python3.12",
+    "exists": true,
+    "target_stat": {
+      "path": "/usr/bin/python3.12",
+      "device": 66315,
+      "inode": 134218327,
+      "bytes": 8020928,
+      "allocated_bytes": 8024064,
+      "mtime_ns": 1788171506000000000,
+      "mode": 33261,
+      "links": 1
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/bin/python3": {
+    "target": "/usr/bin/python3.12",
+    "exists": true,
+    "target_stat": {
+      "path": "/usr/bin/python3.12",
+      "device": 66315,
+      "inode": 134218327,
+      "bytes": 8020928,
+      "allocated_bytes": 8024064,
+      "mtime_ns": 1788171506000000000,
+      "mode": 33261,
+      "links": 1
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/bin/python": {
+    "target": "/usr/bin/python3.12",
+    "exists": true,
+    "target_stat": {
+      "path": "/usr/bin/python3.12",
+      "device": 66315,
+      "inode": 134218327,
+      "bytes": 8020928,
+      "allocated_bytes": 8024064,
+      "mtime_ns": 1788171506000000000,
+      "mode": 33261,
+      "links": 1
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_npp_cu12-12.4.1.87.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_npp_cu12-12.4.1.87.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_npp_cu12-12.4.1.87.dist-info",
+      "device": 66306,
+      "inode": 240920531,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1788084486280090326,
+      "mode": 16893,
+      "links": 3
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_nvtx_cu12-12.8.90.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_nvtx_cu12-12.8.90.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_nvtx_cu12-12.8.90.dist-info",
+      "device": 66306,
+      "inode": 239206577,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755684846285980,
+      "mode": 16893,
+      "links": 2
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_cusparselt_cu12-0.7.1.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cusparselt_cu12-0.7.1.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cusparselt_cu12-0.7.1.dist-info",
+      "device": 66306,
+      "inode": 239206573,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755680339393137,
+      "mode": 16893,
+      "links": 2
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_nccl_cu12-2.27.5.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_nccl_cu12-2.27.5.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_nccl_cu12-2.27.5.dist-info",
+      "device": 66306,
+      "inode": 239206574,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755687182434925,
+      "mode": 16893,
+      "links": 3
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_curand_cu12-10.3.9.90.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_curand_cu12-10.3.9.90.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_curand_cu12-10.3.9.90.dist-info",
+      "device": 66306,
+      "inode": 239206570,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755687367436052,
+      "mode": 16893,
+      "links": 2
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_nvshmem_cu12-3.4.5.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_nvshmem_cu12-3.4.5.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_nvshmem_cu12-3.4.5.dist-info",
+      "device": 66306,
+      "inode": 239206576,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755685487424590,
+      "mode": 16893,
+      "links": 3
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/torchgen": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/torchgen",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/torchgen",
+      "device": 66306,
+      "inode": 239206612,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755706909475896,
+      "mode": 16893,
+      "links": 10
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_cusparse_cu12-12.5.8.93.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cusparse_cu12-12.5.8.93.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cusparse_cu12-12.5.8.93.dist-info",
+      "device": 66306,
+      "inode": 239206572,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755693378105267,
+      "mode": 16893,
+      "links": 2
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_cublas_cu12-12.8.4.1.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cublas_cu12-12.8.4.1.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cublas_cu12-12.8.4.1.dist-info",
+      "device": 66306,
+      "inode": 239206563,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755689745630470,
+      "mode": 16893,
+      "links": 2
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_cuda_runtime_cu12-12.8.90.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cuda_runtime_cu12-12.8.90.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cuda_runtime_cu12-12.8.90.dist-info",
+      "device": 66306,
+      "inode": 239206566,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755687394766812,
+      "mode": 16893,
+      "links": 2
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/torch": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/torch",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/torch",
+      "device": 66306,
+      "inode": 239206609,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755704317268091,
+      "mode": 16893,
+      "links": 67
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_cudnn_cu12-9.10.2.21.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cudnn_cu12-9.10.2.21.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cudnn_cu12-9.10.2.21.dist-info",
+      "device": 66306,
+      "inode": 239206567,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755697327819306,
+      "mode": 16893,
+      "links": 3
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/triton-3.6.0.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/triton-3.6.0.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/triton-3.6.0.dist-info",
+      "device": 66306,
+      "inode": 239206617,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755681804705824,
+      "mode": 16893,
+      "links": 3
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_cuda_nvrtc_cu12-12.8.93.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cuda_nvrtc_cu12-12.8.93.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cuda_nvrtc_cu12-12.8.93.dist-info",
+      "device": 66306,
+      "inode": 239206565,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755687904568600,
+      "mode": 16893,
+      "links": 2
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/torch-2.10.0.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/torch-2.10.0.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/torch-2.10.0.dist-info",
+      "device": 66306,
+      "inode": 239206608,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755707003554969,
+      "mode": 16893,
+      "links": 3
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia",
+      "device": 66306,
+      "inode": 239206562,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1788084484946078027,
+      "mode": 16893,
+      "links": 19
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_cuda_cupti_cu12-12.8.90.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cuda_cupti_cu12-12.8.90.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cuda_cupti_cu12-12.8.90.dist-info",
+      "device": 66306,
+      "inode": 239206564,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755687973682735,
+      "mode": 16893,
+      "links": 2
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_cufft_cu12-11.3.3.83.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cufft_cu12-11.3.3.83.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cufft_cu12-11.3.3.83.dist-info",
+      "device": 66306,
+      "inode": 239206568,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755694126704891,
+      "mode": 16893,
+      "links": 2
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_cusolver_cu12-11.7.3.90.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cusolver_cu12-11.7.3.90.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cusolver_cu12-11.7.3.90.dist-info",
+      "device": 66306,
+      "inode": 239206571,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755699254508212,
+      "mode": 16893,
+      "links": 2
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_nvjitlink_cu12-12.8.93.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_nvjitlink_cu12-12.8.93.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_nvjitlink_cu12-12.8.93.dist-info",
+      "device": 66306,
+      "inode": 239206575,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755685719301878,
+      "mode": 16893,
+      "links": 2
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/functorch": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/functorch",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/functorch",
+      "device": 66306,
+      "inode": 239206530,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755704302538696,
+      "mode": 16893,
+      "links": 8
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/nvidia_cufile_cu12-1.13.1.3.dist-info": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cufile_cu12-1.13.1.3.dist-info",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/nvidia_cufile_cu12-1.13.1.3.dist-info",
+      "device": 66306,
+      "inode": 239206569,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755687379038442,
+      "mode": 16893,
+      "links": 2
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/.venv-voxtral/readonly-cuda-site/triton": {
+    "target": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/triton",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/.venv/lib/python3.12/site-packages/triton",
+      "device": 66306,
+      "inode": 239206618,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1773755681703197158,
+      "mode": 16893,
+      "links": 12
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/models/bandit-v2/runtime/lib64": {
+    "target": "/home/kciceblue/HF/auto-subtitle/models/bandit-v2/runtime/lib",
+    "exists": true,
+    "target_stat": {
+      "path": "/home/kciceblue/HF/auto-subtitle/models/bandit-v2/runtime/lib",
+      "device": 66306,
+      "inode": 12979338,
+      "bytes": 4096,
+      "allocated_bytes": 4096,
+      "mtime_ns": 1789394932331016784,
+      "mode": 16893,
+      "links": 3
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/models/bandit-v2/runtime/bin/python3.12": {
+    "target": "/usr/bin/python3.12",
+    "exists": true,
+    "target_stat": {
+      "path": "/usr/bin/python3.12",
+      "device": 66315,
+      "inode": 134218327,
+      "bytes": 8020928,
+      "allocated_bytes": 8024064,
+      "mtime_ns": 1788171506000000000,
+      "mode": 33261,
+      "links": 1
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/models/bandit-v2/runtime/bin/python3": {
+    "target": "/usr/bin/python3.12",
+    "exists": true,
+    "target_stat": {
+      "path": "/usr/bin/python3.12",
+      "device": 66315,
+      "inode": 134218327,
+      "bytes": 8020928,
+      "allocated_bytes": 8024064,
+      "mtime_ns": 1788171506000000000,
+      "mode": 33261,
+      "links": 1
+    }
+  },
+  "/home/kciceblue/HF/auto-subtitle/models/bandit-v2/runtime/bin/python": {
+    "target": "/usr/bin/python3.12",
+    "exists": true,
+    "target_stat": {
+      "path": "/usr/bin/python3.12",
+      "device": 66315,
+      "inode": 134218327,
+      "bytes": 8020928,
+      "allocated_bytes": 8024064,
+      "mtime_ns": 1788171506000000000,
+      "mode": 33261,
+      "links": 1
+    }
+  }
+}

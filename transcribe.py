@@ -116,8 +116,9 @@ def process_file(
 
     try:
         # Step 1: Extract audio
-        raw_wav = temp_dir / "audio_raw.wav"
-        extract_audio(input_path, raw_wav)
+        raw_wav = config.cached_audio or temp_dir / "audio_raw.wav"
+        if not raw_wav.exists():
+            extract_audio(input_path, raw_wav)
 
         # Step 2: Vocal separation (optional)
         if config.no_demucs:
@@ -146,6 +147,9 @@ def process_file(
 
         # Step 4: Write SRT
         write_srt(segments, output_path)
+        from dataclasses import asdict
+        from src.workflow_state import write_json
+        write_json(output_path.with_suffix(".asr.json"), [asdict(seg) for seg in segments])
 
         elapsed = time.monotonic() - t_start
         logger.info(
@@ -209,6 +213,7 @@ def run_transcribe(config: TranscribeConfig) -> tuple[int, list[Path]]:
         "keep_temp": config.keep_temp,
         "verbose": config.verbose,
         "hotwords": config.hotwords,
+        "hotword_mode": config.hotword_mode,
         "warden_admin_url": config.warden_admin_url,
         "unload_warden_before_asr": config.unload_warden_before_asr,
         "files": [str(f) for f in files],

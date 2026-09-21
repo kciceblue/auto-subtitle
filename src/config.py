@@ -46,10 +46,18 @@ class TranscribeConfig:
     beam_size: int = 5
     no_demucs: bool = False
     keep_temp: bool = False
+    cached_audio: Path | None = None
     verbose: bool = False
     # ASR hotwords: explicit word list passed to faster-whisper to bias
     # transcription toward known terminology (character names, domain terms).
     hotwords: list[str] = field(default_factory=list)
+    hotword_mode: str = "model"  # "explicit" uses files; "none" disables ASR bias
+    ensemble_source: str = "consensus"  # optional original-audio Qwen or NeMo preference
+    nemo_model: Path | None = None  # local NeMo archive, required only for NeMo source
+    nemo_python: Path | None = None  # executable inside an isolated NeMo environment
+    qwen_asr_hotwords: bool = True
+    asr_window_seconds: float = 20.0  # core duration; 0.8s context on each edge
+    source_pause_units: bool = False  # opt-in token-preserving pause split before translation
     # File(s) containing hotword candidates (one per line). Merged with
     # LLM-generated hotwords from README/context files.
     hotwords_file: Path | None = None
@@ -76,6 +84,30 @@ class TranscribeConfig:
     unload_warden_before_asr: bool = True
 
     def __post_init__(self) -> None:
+        if self.hotword_mode not in {"model", "explicit", "none"}:
+            raise ValueError(f"Unknown hotword mode: {self.hotword_mode}")
+        import math
+        if (isinstance(self.asr_window_seconds, bool)
+                or not isinstance(self.asr_window_seconds, (int, float))
+                or not math.isfinite(self.asr_window_seconds)
+                or not 8.0 <= self.asr_window_seconds <= 28.0):
+            raise ValueError("ASR window core must be finite and between 8 and 28 seconds")
+        if self.ensemble_source not in {"consensus", "qwen", "nemo"}:
+            raise ValueError(f"Unknown ensemble source policy: {self.ensemble_source}")
+        if self.ensemble_source == "nemo":
+            import os
+            if self.language not in {"ja", "auto", None}:
+                raise ValueError("The NeMo source model supports Japanese audio only")
+            if self.nemo_model is None or self.nemo_python is None:
+                raise ValueError("NeMo source requires --nemo-model and --nemo-python")
+            self.nemo_model = Path(self.nemo_model).expanduser().absolute()
+            self.nemo_python = Path(self.nemo_python).expanduser().absolute()
+            if not self.nemo_model.is_file():
+                raise FileNotFoundError(f"NeMo model archive not found: {self.nemo_model}")
+            if not self.nemo_python.is_file() or not os.access(self.nemo_python, os.X_OK):
+                raise ValueError(f"NeMo Python is not an executable file: {self.nemo_python}")
+        elif self.nemo_model is not None or self.nemo_python is not None:
+            raise ValueError("NeMo paths require --ensemble-source nemo")
         if self.input_file is not None:
             self.input_file = Path(self.input_file)
             if not self.input_file.exists():
@@ -151,9 +183,14 @@ class TranslateConfig:
     # translation/proofread (thinking-off) are unaffected by the larger cap.
     max_tokens: int = 16384
     extra_payload: dict | None = None
+    separate_instruction: bool = False  # opt-in system context + user batch for prefix caching
+    translation_reasoning_budget: int = 0  # first draft only: 0/off, 256 or 512 tokens per thinking block
+    translation_episode_context: bool = False  # complete chosen-source context, first draft only
+    coherence_polish: bool = False  # optional local document-context editing before display
+    coherence_recipe: Path | None = None  # explicit local multi-pass editor configuration
     vocab_file: Path | None = None
-    # Context file(s) (e.g. README.txt / synopsis) injected into the system
-    # prompt so the LLM understands the story, characters and domain
+    # Context file(s) (e.g. README.txt / synopsis) injected into the instruction
+    # prefix so the LLM understands the story, characters and domain
     # terminology before translating.
     context_files: list[Path] = field(default_factory=list)
     # Content-kind per context file (path-string → "synopsis"|"script"),
@@ -163,6 +200,22 @@ class TranslateConfig:
     # injected into translation/review context so domain terms from the
     # filename (e.g. 去勢) help the LLM pick terms the ASR garbled.
     title: str | None = None
+    # Compact work context and immutable cue evidence for the new workflow.
+    context_summary: str | None = None
+    line_notes: dict[int, list[str]] = field(default_factory=dict)
+    scene_context_lines: int = 3
+    pack_scenes: bool = False
+    structured_qa: bool = False  # experimental local llama.cpp JSON-schema QA
+    structured_translation: bool = False  # optional exact local-ID JSON draft responses
+    delta_verification: bool = False  # experimental before/after repair transactions
+    pause_layout: bool = False  # experimental exact target partition at supported pauses
+    source_span_repair: bool = False  # experimental fixed raw-ASR alternatives plus realignment
+    entity_placeholders: bool = False  # experimental grounded temporary name markers
+    entity_notes: dict[int, list[str]] = field(default_factory=dict)
+    scene_max_chars: int = 2400
+    telemetry_path: Path | None = None
+    stage: str = "llm"
+    response_guard_floor: int = 0  # structured outputs have fixed schema overhead
     # Optional dialogue script (台词台本) of the work — ground truth that
     # outranks audio arbitration. Injected into translation context with
     # script-aware sampling, and anchored into the review pass
@@ -191,6 +244,12 @@ class TranslateConfig:
     verbose: bool = False
 
     def __post_init__(self) -> None:
+        if type(self.separate_instruction) is not bool:
+            raise ValueError("separate_instruction must be a boolean")
+        if type(self.translation_reasoning_budget) is not int or self.translation_reasoning_budget not in (0, 256, 512):
+            raise ValueError("Translation reasoning budget must be 0, 256 or 512")
+        if self.translation_reasoning_budget and self.max_tokens <= self.translation_reasoning_budget:
+            raise ValueError("Total max_tokens must leave final-answer room after the translation reasoning budget")
         if self.input_srt is not None:
             self.input_srt = Path(self.input_srt)
         if self.output_srt is not None:

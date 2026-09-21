@@ -165,3 +165,14 @@ def build_title_notes(
                 + " 但字面不同——疑似 ASR 误识（同音不同字），若语义不通请按标题词修正"
             ]
     return notes
+
+
+def clean_release_title(title: str | None) -> str | None:
+    """Keep work names but discard season/release/encoding fields in tagged filenames."""
+    if not title or not re.match(r'^S\d+E\d+\s*[- ]', title, re.I):
+        return title
+    parts = re.findall(r'\[([^]]+)\]', title)
+    names = [part.replace('_', ' ') for part in parts
+             if not re.fullmatch(r'\d+|\d{3,4}[pi]|GB|BIG5|CHS|CHT|HEVC|AVC|x26[45]|AAC|FLAC',part,re.I)
+             and not re.search(r'[&+]',part)]
+    return ' '.join(names).strip() or None
