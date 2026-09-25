@@ -1,5 +1,10 @@
 # Current local quality results — 2026-09-16
 
+This page records historical v4 results. The six retained candidates were later
+reviewed under v5: all scored **5 / 5** across two independent reviews. See the
+[September 24 comparison](six-candidates-v5-results-20260924.md); the historical
+scores below are preserved, not rescaled.
+
 Best observed scalar remains **3**. These twenty-four completed candidates contain six 3s, seventeen 2s and one -4, with no passing4, confirmation or demonstrated consistent4. All record successful restoration. This consolidation reports numeric/status/hash fields from result summaries, native receipts, state files and score wrappers. Text differences are counted programmatically; production texts are not semantically inspected for diagnosis, and no model calls are made by the consolidation.
 
 Writers use Gemma31 (QAT Q4 except ordinary Q8 for Q8-G1) with context163840, except DS-G3 which uses local DeepSeek-V4-Flash-0731 UD-IQ3_XXS with context196608. All reserve16384 outputtokens; thinking is off except GT-G1 and DeepSeek. Recipe descriptions identify the declared treatment, not evidence of semantic improvement. Scores come from `score.json`; newer controllers leave `screen.json.score` null after optional review.

@@ -75,6 +75,15 @@ class SelectedPipelineChecks(unittest.TestCase):
         self.assertIsNone(ledger[0]['source_index']);self.assertEqual(source[0].index,1)
         self.assertFalse(ledger[0]['silence_verified'])
 
+    def test_exhausted_repetition_window_can_commit_as_empty(self):
+        empty = asr.compression_check('', asr.REPETITION_POLICY)
+        self.assertTrue(empty['passed'])
+        windows=[{'number':1,'start_frame':0,'end_frame':16000,'sha256':'a'}]
+        rows=[{'window':1,'start_frame':0,'end_frame':16000,'audio_sha256':'a','text':'',
+               'accepted_text_sha256':asr.text_hash(''),'repetition_check':empty,'exhausted_as_empty':True}]
+        source,ledger=asr.assemble_windows({'windows':windows},rows,repetition_guard=asr.REPETITION_POLICY)
+        self.assertEqual(source,[]);self.assertTrue(ledger[0]['empty']);self.assertTrue(ledger[0]['exhausted_as_empty'])
+
     def test_translation_request_contract(self):
         source=[SrtBlock(1,'00:00:00,000 --> 00:00:02,000','テスト')]
         body,instruction,schema=pipeline._translation_inputs(source,'synthetic context\n')

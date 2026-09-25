@@ -1,108 +1,184 @@
 # Subtitle quality and validation
 
-Current benchmark: **subtitle-quality-v4**. The working target is **four: usable
-subtitles in the supplied dialogue context**. Subtitles are not standalone prose.
-Source-supported fragments, ellipsis, repetitions, interjections, sound effects,
-speaker changes and scene cuts are acceptable. Do not invent unseen visual
-explanations to excuse a clear contradiction of the supplied source.
+Current scoring rubric: **subtitle-quality-v5**, scope **subtitle_text_quality**.
+A quality rating describes the supplied subtitle text. Verification of the source,
+coverage and playback is recorded separately. A text-only review can award **8–10**
+when the observed quality warrants it; that number is not audio certification or
+release approval. Human and machine translations use exactly the same rubric.
 
-## Scale
+## Quality scale
 
-| Score | Meaning |
+| Score | Observed subtitle quality |
 |---|---|
-| −10 to −1 | Increasingly worse than ordinary unreviewed machine translation. |
-| 0 | Ordinary unreviewed machine translation; no vendor-specific baseline required. |
-| 1–3 | Material translation-added confusion or errors still prevent usable quality. |
-| **4** | Usable dialogue subtitles relative to the supplied transcript and original context; minor roughness and source-supported discontinuities are allowed. |
-| 5 | Stronger naturalness and faithful expression relative to that evidence. |
-| **6** | No detected errors after full independent source, completeness and playback validation; plain language is acceptable. |
-| 8 | The same validated correctness plus polished professional human-quality expression. |
-| 10 | Exceptional expression, nuance and presentation, with the same correctness requirement. |
+| 0 | No usable subtitle content. |
+| 1–2 | Mostly unusable; severe, pervasive confusion or loss of meaning. |
+| 3–4 | Some understandable content, but recurring material problems impair viewing. |
+| 5 | Understandable overall; noticeable weaknesses require substantial editing. |
+| 6 | Usable, with recurring roughness or several localized problems. |
+| 7 | Good, generally natural and coherent; localized weaknesses limit the polish. |
+| **8** | Professional-quality, natural, concise and context-appropriate; supported meaning and character voice are preserved. Isolated minor imperfections are allowed. |
+| 9 | Excellent expression, nuance and dialogue voice; rare negligible weaknesses. |
+| 10 | Exceptional, sustained precision and expressive craft. Rare but attainable. |
 
-Scores are ordinal judgments, not accuracy percentages. A score change caused by
-revising the rubric is a **reevaluation of the same output**, not a generation
-improvement. Historical v1–v3 assessments retain their original meaning. The
-superseded v3 policy is preserved locally at
-`docs/benchmarks/contextual-selection-20260914/historical-policy/QUALITY-v3.md`.
+Scores are ordinal judgments, not accuracy percentages. Ordinary machine
+translation has no fixed score; human authorship gives no automatic bonus.
+An isolated typo does not make an otherwise strong episode unusable. Recurring
+material meaning errors cannot earn eight merely because the Chinese is fluent.
+Positive evidence of quality is required, not just absence of proven mistakes.
 
-## Local completion and optional scoring
+V5 changes the anchors as well as removing the evidence-dependent ceiling. **V3,
+v4, the exploratory September 24 audit, and v5 numbers are not interchangeable.**
+Do not multiply old scores, relabel receipts, or call a rubric-only score change a
+translation improvement. The former policy is preserved in
+[the v4 policy snapshot](design/subtitle-quality-v4.md).
 
-ASR, evidence collection, interpretation, diagnosis, writing and repair must all
-run locally. Local completion must not require Astra, evaluator credentials,
-previous scores or an external approval. Save the final output before optional
-scoring; that score cannot modify the output or become a repair prompt.
+## What the external reviewer returns
 
-The independent benchmark below measures a frozen result. A run without it is
-**completed, unscored**, not failed and not a claimed four. A confirmed score for
-one saved candidate also does not establish a consistently four-point workflow.
-Current qualification requires fresh local runs, all frozen before their scores
-are opened, followed by separate generalization checks. Experimental scalar
-results and production defaults are recorded separately.
+The v5 response contains five fields, validated by
+[src/subtitle_quality_contract.py](src/subtitle_quality_contract.py):
 
-## Evidence and independence
+| Field | Meaning |
+|---|---|
+| `quality_score` | Holistic quality of assessable subtitle text, 0–10. Provisional with respect to the original media. |
+| `expression_score` | Target-language naturalness, dialogue voice, readability and continuity, 0–10. |
+| `fidelity_to_evidence_score` | Meaning preservation against credible supplied source passages, 0–10; `null` when evidence is insufficient. This is not fidelity certified against the audio. |
+| `whole_text_read` | The reviewer's self-report that it read every supplied source, target and context item. Must be `true`; otherwise the review is incomplete. |
+| `confidence` | Certainty in this text assessment, 0–1. It is not the quality score. |
 
-Writing, ASR, diagnosis and repair stay local. The stronger evaluator is separate:
-GPT-6 Astra (`gpt-6-astra`), or Fable 5.1 where a genuine validated adapter exists.
-The current experiments use Astra only after a frozen local candidate. The
-evidence-aware adapter receives the authorized original Japanese/context, fixed
-736-observation transcript pool and generated Chinese. New acoustic observations
-and local interpretations stay local. It receives no audio, video, human
-reference, prior scores or workflow identities.
+Do not average the dimension scores mechanically. When fidelity is unassessable,
+`quality_score` describes the assessable target expression and confidence reflects
+the limitation. Unknown evidence is not a zero. Complete input delivery and a
+reading self-report do not prove attention to every cue or full-media coverage.
 
-The experimental evidence-aware reviewer returns **only one integer score**. It
-returns no confidence or reading-coverage attestation. The older contextual
-adapter used for the selected-output release commands below also preserves pass,
-whole-text-read and confidence metadata; those are not part of the experimental
-scalar contract. Neither adapter supplies locations, categories, explanations or
-replacement wording to translation, repair, retrieval or training. A score may
-select a complete local workflow; it cannot teach that workflow episode-specific
-repairs. Exact inputs, prompts, schemas, producers and genuine dispatches are
-preserved with hashes. Complete input delivery does not measure reviewer
-attention or establish a calibrated guarantee.
+The local receipt always records `audio_reviewed`, `video_reviewed`,
+`audio_source_fidelity_certified`, `full_media_coverage_verified`,
+`playback_verified`, `release_gate_checked` and `overall_quality_certified` as
+**false**. The reviewer cannot switch these on. For example, **text quality 8;
+source/coverage/playback unverified** is valid. An unqualified claim of a verified
+whole-episode eight is not supported by this command.
 
-The Japanese transcript is unverified and may contain local repairs or recognition
-errors. V4 contextual review checks translation against that evidence and has a
-maximum score of **five**. Agreement with a wrong transcript can still pass this
-scope. It does not establish audio truth, dialogue coverage, speaker identity,
-subtitle synchronization or playback readability. Those require separate source
-and playback validation before six. Minor timing warnings remain visible.
+## Fair treatment of subtitles and evidence
 
-## Contextual milestone gate
+Subtitles are dialogue, not standalone prose. Accept source-supported fragments,
+ellipsis, repetitions, interjections, scene and speaker changes, idiomatic
+condensation and natural rephrasing that preserve meaning. Check actions,
+negation, intention versus outcome, relationships and nuance across neighboring
+text and time; do not demand literal word matching.
 
-1. Freeze the complete source/target/context bundle. Source and target must have
-   matching cue IDs and timestamps; malformed or missing cues fail preparation.
-2. Obtain an independent whole-bundle review with the fixed v4 contract.
-3. Obtain a new confirmation dispatch on the same unchanged files after the first
-   review completes. Both scores must be at least four. Use their minimum.
-4. Bind both receipts and every final deliverable to the assessment. Check strict
-   SRT structure, paired files, positive durations and absence of overlaps.
-5. Edits to reviewed source, Chinese, context, receipts or final files invalidate
-   that assessment. Review the newly frozen result again.
+Japanese ASR and locally repaired transcripts remain fallible. Agreement with a
+wrong transcript does not establish accuracy. A transcript conflict alone does
+not prove the translation wrong, and empty ASR does not prove silence. Supported
+meaning errors affect quality; unresolved source conflicts affect certainty.
+Do not invent unseen visual explanations to excuse a well-supported contradiction.
+OCR defects and translation defects are also distinct. Verify suspect glyphs
+against frames when available; preserve the actual subtitle wording.
 
-Short cues below 0.4 seconds and long cues above 10 seconds require playback
-review; this text-only milestone does not certify their suitability. A contextual
-milestone cannot authorize the source-verified release packaging command.
+Source and target are validated independently. They may have different cue counts
+and timing. Preserve human segmentation; do not rewrite it to fit the pipeline's
+ASR windows. Overlapping dialogue, lyrics and on-screen text may be legitimate
+layers. Supply their roles in context and assess them separately; unreliable
+lyric ASR is not evidence of a bad lyric translation. Overlap acceptance is a
+text-ingestion rule, not proof that the rendered layout is readable.
+
+## Local completion, independence and calibration
+
+ASR, evidence collection, translation, diagnosis and repair remain local. Local
+completion must not require an external evaluator, credentials or a passing score.
+Freeze output before optional scoring; a completed unscored run is not failed.
+The external reviewer is GPT-6 Astra (`gpt-6-astra`), evaluation only, using the
+explicitly authorized source/target/context text. This adapter exports no audio
+or video and supplies no findings, locations or replacement wording to writers.
+
+V5 returns numeric dimensions and reading/confidence metadata; it is deliberately
+not the historical experimental one-integer response. Old campaigns retain that
+old contract. Audit explanations, when separately authorized, remain audit
+artifacts and must not become episode-specific writer or repair prompts.
+
+Hide authorship, workflow identity, expected score and prior ratings during
+calibration. Freeze the rubric before reviewing. Report all predeclared review
+results, including disagreements; do not rerun until a desired score appears.
+A human reference is a candidate or control, not a guaranteed eight. One episode
+cannot establish reviewer calibration or generalization: use multiple blind
+controls and deliberately degraded controls before making those broader claims.
+The [September 24 calibration](design/subtitle-quality-v5-calibration-20260924.md)
+records both blind v5 results for the supplied human-subtitled episode: overall
+seven in both reviews, with source and playback still unverified.
+The [six-candidate comparison](design/six-candidates-v5-results-20260924.md)
+subsequently scored every retained candidate five in both blind reviews using
+the same rubric and common evidence across candidates. Those candidates are
+from another episode, so this is not a paired comparison with the human sample.
+The [fresh same-video comparison](design/reference-six-methods-results-20260924.md)
+completed all six local workflows and fourteen common-basis v5 reviews. Every
+generated candidate scored six in both reviews; the unchanged human reference
+scored seven in both. These are fresh ratings on the same episode and evidence,
+not a rescaling of the historical scores or proof of playback readiness.
+The [local meaning-audit pilot](design/local-meaning-episode-results-20260924.md)
+then independently corrected the discussed perspective error but remained six
+in both blind reviews. Its failed control gate and observed regressions remain
+recorded; subsequent expression and translation experiments did not reach seven.
+The [self-correction experiment log](design/local-self-correction-results-20260924.md)
+records expression editing, bilingual revision, independent translation,
+scene-level draft comparison, UD Qwen reasoning and whole-episode local
+self-critique under the same frozen scoring basis. The best verified overall
+result remains six/six. The self-critic reported only uncertainties, produced
+no revision, and was not rescored. The final structured correction of the UD
+draft also scored six/six in all three dimensions: one clear meaning repair
+came with two lyric omissions, and the original perspective error remained.
+All planned reviews are complete. None of these candidates was promoted.
+The [September 25 presentation controls](design/presentation-controls-results-20260925.md)
+then separated presentation from wording. The human text kept seven/seven under
+the machine's coarse segmentation and timing; LC's text with word-aligned cues
+and subtitle punctuation stayed six/six; a generic local register rewrite of
+that result also stayed six/six. Presentation is not the binding factor on this
+episode; the remaining gap is in the Chinese wording. Overall equalled expression
+in all 34 v5 reviews of the episode.
+The [September 25 wording trials](design/wording-trials-results-20260925.md) reached
+6/6/7 in both reviews with two local recipes. The simpler one, the evidence-first
+rewrite, is now the [retained workflow](WORKFLOW.md). On a held-out episode, the
+multi-stage recipe scored 5/6/5 against the human reference's 7/7/7. Given the same
+inputs, a stronger non-local writer scored 7–8. The
+[ceiling record](design/local-ceiling-20260925.md) concludes that the local writer, not
+the evidence, is the limit without fine-tuning.
+
+## New scoring command
+
+The manifest has `version: "subtitle-quality-bundle-v1"` and `source`, `target`,
+`context` entries, each containing an absolute plain-file `path` and exact
+`sha256`. Source and target are UTF-8 SRTs; context is UTF-8 text and can describe
+lyric cue IDs, approximate timing, OCR limits and source uncertainty. File paths
+remain in local provenance; the reviewer receives only their contents.
 
 ```bash
-# Prepare a review locally; --execute explicitly invokes the separate evaluator.
-.venv/bin/python scripts/review_contextual.py \
+# Prepare exact prompts, inputs, schema and producing-code snapshots locally.
+.venv/bin/python scripts/review_subtitle_quality.py \
   --manifest /absolute/path/manifest.json --output-dir /absolute/path/new-review
-# Repeat with --execute to send exactly the three prepared text inputs.
 
-# Prepare an unapproved contextual assessment, then bind actual confirmed receipts.
-.venv/bin/python main.py release output/selected \
-  --prepare --scope contextual_subtitles --writer-model ACTUAL_LOCAL_MODEL
-.venv/bin/python main.py release output/selected \
-  --check --scope contextual_subtitles
+# Explicitly execute the frozen review once using the same arguments.
+.venv/bin/python scripts/review_subtitle_quality.py \
+  --manifest /absolute/path/manifest.json --output-dir /absolute/path/new-review \
+  --execute
+
+# Validate completed inputs, hashes, dispatch identity and receipt read-only.
+.venv/bin/python scripts/review_subtitle_quality.py \
+  --manifest /absolute/path/manifest.json --output-dir /absolute/path/new-review \
+  --validate
 ```
 
-Manifest version `contextual-review-bundle-v1` contains `source`, `target` and
-`context`, each with a plain absolute `path` and exact `sha256`. The assessment's
-`contextual_reviews` binds each final target to a manifest, primary/confirmation
-directories and their receipt hashes. Templates are unapproved. Actual reviews
-must be obtained; manually filling a passing scalar is insufficient.
+Each execution preserves a real dispatch, model identity, hashes and failure
+receipt; it cannot overwrite or retry an existing attempt. A confirmation uses a
+new directory and the same unchanged manifest. Do not edit reviewed files; freeze
+and assess a new result if content changes.
 
-Historical `target_coherence` v3 checks and `source_verified` release checks remain
-available for existing records. The latter retains its stricter no-detected-error
-requirements. Local model agreement or a successful pipeline run cannot approve
-release.
+## Historical gates stay versioned
+
+The v3 Chinese-only reviewer is capped at four; v4 contextual review is capped at
+five. Those were scope-dependent scales, not conventional quality out of ten.
+Historical campaign controllers, `scripts/review_contextual.py` and `main.py release`
+kept their v3/v4 contracts. They were removed from the tree on 2026-09-25 and remain in
+git history. Stored v3/v4 scores are not migrated to v5: the former round-93 workflow's
+v4 score of three stays a v4 three.
+
+New text scoring does not authorize publishing, promote a workflow, or replace
+independent source, completeness and playback validation. The
+[v4 snapshot](design/subtitle-quality-v4.md) records the historical preparation,
+confirmation and release commands.

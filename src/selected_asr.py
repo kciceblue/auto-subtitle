@@ -546,7 +546,18 @@ def run(spec: dict) -> dict:
                 save()
             pending=retry
             if not pending:break
-        if pending:raise RuntimeError('One or more native ASR windows exhausted their bounded attempts')
+        if pending:
+            empty_check=compression_check('',policy)
+            for p in pending:
+                number=p['number'];path=output/'requests'/f'window-{number:03d}.json'
+                requests[number]['exhausted_as_empty']=True;write_json(path,requests[number])
+                accepted[number]={'window':number,'start_frame':p['start_frame'],'end_frame':p['end_frame'],
+                    'text':'','empty':True,'accepted_text_sha256':text_hash(''),
+                    'audio_sha256':p['sha256'],'request_path':str(path),'request_sha256':file_hash(path),
+                    'model':ALIAS,'status':'UNVERIFIED','source_fidelity_verified':False,
+                    'repetition_check':empty_check,'raw_repetition_check':None,
+                    'native_token_ids_sha256':json_hash([]),'exhausted_as_empty':True}
+            result['exhausted_empty_windows']=[p['number'] for p in pending];save()
         if sorted(accepted)!=[p['number'] for p in plan['windows']]:raise ValueError('Completed worker omitted or duplicated a window')
         verify_window_plan(plan)
         if json_hash(bundle_identity(Path(spec['model_dir'])))!=spec['bundle_identity_sha256']:raise ValueError('Model/API changed during inference')
