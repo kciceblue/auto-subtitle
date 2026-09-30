@@ -1,0 +1,12 @@
+# Separate runtime for the Voxtral readings (evidence stage). src/voxtral_source_native.py
+# refuses to run unless torch, transformers and mistral-common match these exact versions.
+#   python3 -m venv .venv-voxtral
+#   .venv-voxtral/bin/pip install -r requirements-voxtral.txt --extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.10.0
+transformers==5.3.0
+mistral-common==1.11.7
+accelerate==1.12.0
+soundfile>=0.14.0
+soxr>=1.1.0
+pycountry
+nvidia-npp-cu12

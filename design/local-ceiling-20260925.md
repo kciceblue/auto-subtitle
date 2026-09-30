@@ -49,14 +49,13 @@ Limits of this claim:
 - Claude self-review ran about one point more lenient than Astra at the 6/7 boundary, so
   only Astra and pairwise results support claims.
 
-## Next step: fine-tuning (not started)
+## Next step: fine-tuning (moved out of this repository)
 
-- Estimated data: a pilot with 10–20k aligned line pairs; for a robust result, 40–100k
-  pairs across 20+ series.
-- One clean source already exists: 28 episodes of 葬送的芙莉莲 bilingual JPSC `.ass`
-  subtitles on the local file server, about 9k pairs.
-- Blocked on approval to download base weights: about 54 GB bf16 or 16 GB 4-bit.
-- Evaluation will reuse the v5 scorer ([QUALITY.md](../QUALITY.md)) and the local benchmark basis below.
+The plan written here on 2026-09-25 was to fine-tune the local writer on paired
+Japanese/Chinese subtitles and to evaluate it with the v5 scorer ([QUALITY.md](../QUALITY.md))
+on the local benchmark basis below. On 2026-09-30 that work moved to a separate local
+project; its code, data and weights are not published. This repository keeps the retained
+workflow above, unchanged.
 
 ## Cleanup record
 

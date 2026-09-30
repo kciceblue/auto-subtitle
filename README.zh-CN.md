@@ -9,10 +9,11 @@
 **现状（2026-09-25）：不做微调，本地系统已到上限。**
 保留流程在基准集上两次独立 [v5](QUALITY.md) 评审均为 **6/6/7**（总分/表达/忠实）。
 人工字幕组为 7 分，即“良好”；6 分为“可用”。证据本身足够：同样的输入交给更强的模型能拿到 7–8 分。
-瓶颈在本地模型的中文表达。下一步是微调本地写作模型。
-详见[上限记录](design/local-ceiling-20260925.md)。
+瓶颈在本地模型的中文表达。要再提高，需要更好的本地写作模型（例如微调后的模型），
+这部分工作不在本仓库中。详见[上限记录](design/local-ceiling-20260925.md)。
 
 ```bash
+./run.sh --check                 # 预检：模型、运行环境、Warden、GPU、磁盘
 ./run.sh                         # 处理 input/ 下所有媒体 -> output/<文件名>/final/
 ./run.sh input/episode.mkv       # 处理单个文件
 .venv/bin/python -m src.evidence_first input/episode.mkv --until draft   # 运行到指定阶段为止
@@ -33,22 +34,26 @@
 6. **成稿**：按词对齐生成字幕条，控制阅读时长，并按字幕习惯处理标点。
 
 GPU 上的模型依次运行：识别进程和 Gemma 服务都是临时启动，结束后恢复 Warden 的 Qwen 模型。
-一集 24 分钟的动画约需 35–45 分钟。阶段细节、所需模型和实测数据见 [WORKFLOW.md](WORKFLOW.md)。
+一集 24 分钟的动画约需 35–45 分钟。阶段细节、故障恢复、所需模型和实测数据见 [WORKFLOW.md](WORKFLOW.md)。
 
 ## 环境要求
 
 - Ubuntu、32 GB NVIDIA 显卡、`ffmpeg`；按 `requirements.txt` 安装 `.venv`，
-  Voxtral 需要 `.venv-voxtral`。
+  按 `requirements-voxtral.txt` 安装 `.venv-voxtral`。
 - `127.0.0.1:8089` 上的 Warden/llama.cpp 服务，提供 `qwen3.8-27b-dflash`；
   Gemma 初稿需要 llama.cpp 的 `llama-server`（见 `profiles/long-context-gemma.json`）。
 - 模型放在 `models/` 和 `~/HF/asr-models/`，清单见 [WORKFLOW.md](WORKFLOW.md)。
+- `./run.sh --check` 会检查以上全部条件，缺什么就给出修复方法。
 
 ## 质量与历史
 
 [QUALITY.md](QUALITY.md) 规定了 v5 评分标准和可选的外部评分命令。评分只用于评估，
-不会反馈给流程。自 2026-09-14 以来的全部本地实验记录在 [design/](design/)；
+不会反馈给流程。自 2026-09-14 以来的全部本地实验记录在 [design/](design/README.md)；
 此前已提交的实验代码仍可在 git 历史中找到。
 
+离线测试（在仓库根目录运行）：
+
 ```bash
-.venv/bin/python -m unittest tests.test_evidence_first tests.test_aligned_display
+.venv/bin/python -m unittest $(git ls-files 'tests/test_*.py' | grep -v voxtral | sed 's#/#.#; s#\.py$##')
+.venv-voxtral/bin/python -m unittest tests.test_voxtral_source_native
 ```

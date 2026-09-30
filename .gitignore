@@ -19,13 +19,14 @@ output/*
 docs/
 CLAUDE.md
 
-# Local cleanup inventories; keep the small receipts in this folder.
+# Untracked leftovers of the 2026-09-16 cleanup (safe to delete).
 design/cleanup-best-six-20260916/plan.json
 design/cleanup-best-six-20260916/retained-before.json
 
 # Tests stay local unless listed here.
 tests/*
 !tests/test_evidence_first.py
+!tests/test_preflight.py
 !tests/test_aligned_display.py
 !tests/test_fresh_source_extras.py
 !tests/test_fresh_writer_inputs.py

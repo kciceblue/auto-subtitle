@@ -11,10 +11,11 @@ The retained workflow scores **6/6/7** (overall/expression/fidelity) in both
 independent [v5](QUALITY.md) reviews on the benchmark episode. The human fansub scores
 7, which is "good"; 6 is "usable". The evidence is not the limit: a stronger writer
 given the same inputs scores 7–8. The limit is the local model's Chinese expression.
-Fine-tuning the local writer is the next step. See the
-[ceiling record](design/local-ceiling-20260925.md).
+Going further needs a better local writer, such as a fine-tuned one; that work is not part
+of this repository. See the [ceiling record](design/local-ceiling-20260925.md).
 
 ```bash
+./run.sh --check                 # preflight: models, runtimes, Warden, GPU, disk
 ./run.sh                         # every media file in input/ -> output/<stem>/final/
 ./run.sh input/episode.mkv       # one file
 .venv/bin/python -m src.evidence_first input/episode.mkv --until draft   # stop after a stage
@@ -38,24 +39,28 @@ resumable, and every LLM request is cached.
 
 Models run one at a time on the GPU: ASR workers and the Gemma server are short-lived,
 and the Warden Qwen model is restored afterwards. A 24-minute episode takes roughly
-35–45 minutes. Stage details, required models and measurements are in
+35–45 minutes. Stage details, failure recovery, required models and measurements are in
 [WORKFLOW.md](WORKFLOW.md).
 
 ## Requirements
 
 - Ubuntu with an NVIDIA GPU with 32 GB, `ffmpeg`, `.venv` from `requirements.txt`, and
-  `.venv-voxtral` for Voxtral.
+  `.venv-voxtral` from `requirements-voxtral.txt`.
 - A Warden/llama.cpp endpoint at `127.0.0.1:8089` serving `qwen3.8-27b-dflash`, and
   llama.cpp `llama-server` for the Gemma draft (`profiles/long-context-gemma.json`).
 - Models under `models/` and `~/HF/asr-models/`, listed in [WORKFLOW.md](WORKFLOW.md).
+- `./run.sh --check` verifies all of the above and prints a fix for anything missing.
 
 ## Quality and history
 
 [QUALITY.md](QUALITY.md) defines the v5 rubric and the optional external scoring
 command. Scoring is evaluation only; it never feeds the workflow. Every local
-experiment since 2026-09-14 is recorded in [design/](design/). Previously committed
-trial code remains in git history.
+experiment since 2026-09-14 is recorded in [design/](design/README.md). Previously
+committed trial code remains in git history.
+
+Offline tests, run from the repository root:
 
 ```bash
-.venv/bin/python -m unittest tests.test_evidence_first tests.test_aligned_display
+.venv/bin/python -m unittest $(git ls-files 'tests/test_*.py' | grep -v voxtral | sed 's#/#.#; s#\.py$##')
+.venv-voxtral/bin/python -m unittest tests.test_voxtral_source_native
 ```

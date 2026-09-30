@@ -1,23 +1,17 @@
-"""GPU headroom coordination with llama-warden — prevent VRAM OOM.
+"""GPU headroom coordination with model-warden: prevent VRAM OOM.
 
-The pipeline runs two heavyweight CUDA models that cannot fit side by side
-on the 32 GB RTX 5090:
+The Warden-resident 27B LLM (qwen3.8-27b-dflash, ~28 GB) fills most of the
+32 GB RTX 5090, so a CUDA model that loads in-process must first make room.
+In the evidence-first workflow this is the Qwen3-ForcedAligner worker of the
+align stage (src/aligned_display.py); the ASR workers and the Gemma draft use
+the stricter unload/restore lifecycle in src/late_audio.py and
+src/local_backend.py instead.
 
-- faster-whisper large-v3 (float16): ~3.8 GB of weights + buffers
-- the warden-resident 27B translator (qwen3.8-27b-hauhau Q4_K_P): ~29 GB
-
-llama-warden is a lazy-loading gateway: it keeps the GPU empty until a chat
+model-warden is a lazy-loading gateway: it keeps the GPU empty until a chat
 request arrives (state "idle", refcount 0), loads on demand, and evicts the
 model on `POST /admin/unload` (200 = GPU clear, 409 = requests in flight).
-
-The rule enforced here:
-
-1. Before ASR loads whisper, make sure at least ``ASR_MIN_FREE_GB`` is free —
-   if not, evict the warden LLM first.
-2. After ASR, the caller releases the whisper model (src.asr.release_model)
-   so warden can lazily re-load the LLM for translation.
-
-At no point do whisper and the LLM share VRAM.
+``ensure_gpu_headroom`` evicts the Warden LLM only when free VRAM is short;
+Warden reloads it lazily on the next chat request.
 """
 
 from __future__ import annotations
@@ -31,13 +25,12 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_ADMIN_URL = "http://127.0.0.1:8089/admin"
 
-# Faster-whisper large-v3 float16 needs ~3.8 GB of weights+buffers on this
-# rig (measured 2026-08-30). The eviction threshold is deliberately
-# conservative: we evict before whisper even starts loading, and leave room
-# for the CUDA context and the desktop compositor.
+# Default thresholds, sized for a ~4 GB speech model (measured 2026-08-30).
+# The eviction threshold is deliberately conservative and leaves room for the
+# CUDA context and the desktop compositor.
 ASR_MIN_FREE_GB = 8.0
-# Below this much free VRAM after eviction, loading whisper will very likely
-# OOM — fail with a clear message instead of crashing mid-transcription.
+# Below this much free VRAM after eviction, loading will very likely OOM —
+# fail with a clear message instead of crashing mid-run.
 ASR_HARD_FLOOR_GB = 6.0
 # qwen3-asr-1.7B (float16) needs ~3.7 GB of weights+buffers on this rig
 # (measured 2026-08-30 via audio arbitration). Same conservative policy as
@@ -65,7 +58,7 @@ def unload_warden(admin_url: str = DEFAULT_ADMIN_URL, timeout: int = 10) -> bool
         return True
     if resp.status_code == 409:
         logger.warning(
-            "warden busy (requests in flight), LLM stays resident — whisper "
+            "warden busy (requests in flight), LLM stays resident — the next model "
             "may not fit. body: %s",
             resp.text[:120],
         )
@@ -90,9 +83,8 @@ def ensure_gpu_headroom(
     up to a few seconds, since an eviction may finish asynchronously).
 
     Shared by every GPU consumer that cannot coexist with the warden-resident
-    27B model (whisper ASR ~3.9 GB, qwen3-asr arbitration ~3.7 GB): call it
-    right before loading, with ``caller`` naming the consumer so the error
-    message stays accurate.
+    27B model: call it right before loading, with ``caller`` naming the
+    consumer so the error message stays accurate.
 
     Returns the free VRAM in bytes after the check. Raises RuntimeError when
     even after eviction the free memory sits below ``hard_floor_gb`` —
@@ -139,8 +131,8 @@ def ensure_gpu_headroom(
         raise RuntimeError(
             f"Not enough free VRAM for {caller} even after evicting the "
             f"warden LLM: {free_gb:.1f} GB free (need >= {hard_floor_gb:.1f} "
-            f"GB). Close other GPU apps, or use --no-demucs and a smaller "
-            f"model / lower compute type."
+            f"GB). Stop the other GPU processes (python -m src.preflight "
+            f"lists them) and retry."
         )
     logger.info("After eviction: %.1f GB free — OK for %s", free_gb, caller)
     return free

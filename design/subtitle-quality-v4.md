@@ -22,8 +22,9 @@ explanations to excuse a clear contradiction of the supplied source.
 Scores are ordinal judgments, not accuracy percentages. A score change caused by
 revising the rubric is a **reevaluation of the same output**, not a generation
 improvement. Historical v1–v3 assessments retain their original meaning. The
-superseded v3 policy is preserved locally at
-`docs/benchmarks/contextual-selection-20260914/historical-policy/QUALITY-v3.md`.
+superseded v3 policy was kept only in an uncommitted local archive
+(`docs/benchmarks/contextual-selection-20260914/historical-policy/QUALITY-v3.md`), which
+is retired as of 2026-09-30.
 
 ## Local completion and optional scoring
 

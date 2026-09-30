@@ -31,7 +31,8 @@ evidence. This is not a paired human-versus-machine performance comparison.
 ## Evidence and validation
 
 The six frozen targets are exactly those in
-`design/cleanup-best-six-20260916/six-trials.json`. All original hashes remain
+`design/cleanup-best-six-20260916/six-trials.json` (removed from the tree on 2026-09-30;
+it remains in git history). All original hashes remain
 unchanged. Each contains 66 coarse rows; JSON-to-SRT conversion preserves every
 text, index and timestamp. No subtitle was regenerated, rewritten or repaired.
 
