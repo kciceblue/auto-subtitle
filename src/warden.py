@@ -16,7 +16,9 @@ Warden reloads it lazily on the next chat request.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import time
 
 import requests
@@ -70,6 +72,117 @@ def unload_warden(admin_url: str = DEFAULT_ADMIN_URL, timeout: int = 10) -> bool
     return False
 
 
+# Admin request timeout for the default JSON-over-HTTP transport.
+ADMIN_TIMEOUT_S = 30.0
+
+
+def _requests_admin(url: str, payload: dict | None = None) -> tuple[int, dict]:
+    """Default admin transport: JSON over HTTP, honouring WARDEN_AUTH_TOKEN.
+
+    Returns ``(status_code, payload)`` instead of raising on error statuses so
+    the retry loop can inspect them. Connection failures propagate as
+    RequestException and are treated as "gateway unreachable".
+    """
+    headers = {}
+    token = os.environ.get("WARDEN_AUTH_TOKEN")
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    if payload is None:
+        response = requests.get(url, headers=headers, timeout=ADMIN_TIMEOUT_S)
+    else:
+        headers["Content-Type"] = "application/json"
+        response = requests.post(url, data=json.dumps(payload).encode("utf-8"),
+                                 headers=headers, timeout=ADMIN_TIMEOUT_S)
+    try:
+        body = response.json()
+    except ValueError:
+        body = {"raw": response.text[:200]}
+    if not isinstance(body, dict):
+        body = {"raw": body}
+    return response.status_code, body
+
+
+def _admin_call(request, url: str, payload: dict | None = None) -> tuple[int | None, dict]:
+    """Normalise one admin transport call into ``(status, payload)``.
+
+    A transport may return a ``(status, payload)`` pair or a payload alone (a
+    200), and may raise on failure carrying the HTTP status in ``code``
+    (urllib's HTTPError) or ``status_code`` (requests). ``status`` is None when
+    the gateway could not be reached at all.
+    """
+    try:
+        result = request(url, payload)
+    except Exception as exc:                                    # noqa: BLE001 - status-aware re-raise below
+        code = getattr(exc, "code", None)
+        if code is None:
+            code = getattr(exc, "status_code", None)
+        if code is None:
+            logger.warning("warden admin call %s failed (%s)", url, exc)
+            return None, {}
+        return int(code), {}
+    if isinstance(result, tuple) and len(result) == 2 and isinstance(result[0], int):
+        payload = result[1] if isinstance(result[1], dict) else {}
+        return int(result[0]), payload
+    return 200, result if isinstance(result, dict) else {}
+
+
+def unload_and_wait(
+    admin_url: str = DEFAULT_ADMIN_URL,
+    *,
+    admin_request=None,
+    confirm: bool = True,
+    max_wait_s: float = 600.0,
+    poll_s: float = 5.0,
+) -> bool:
+    """Evict the warden-resident LLM, retrying while the gateway reports 409 busy.
+
+    A GPU stage evicts Warden to take the card for its own model. Warden answers
+    409 while a request is in flight — most often the agent's own backend
+    answering a chat turn — and those finish within seconds, so backing off and
+    retrying beats failing the whole stage.
+
+    ``admin_request(url, payload=None)`` is the caller's own admin transport, so
+    the retry keeps its auth, timeout and error conventions; it defaults to a
+    plain JSON-over-HTTP client honouring ``WARDEN_AUTH_TOKEN``. With ``confirm``
+    the call also waits for ``/admin/status`` to stop reporting a loaded model —
+    the "GPU clear" contract behind a 200. Callers that launch their own server
+    immediately and never confirmed before pass ``confirm=False``.
+    """
+    request = admin_request or _requests_admin
+    base = admin_url.rstrip("/")
+    deadline = time.monotonic() + max_wait_s
+    attempt = 0
+    while True:
+        attempt += 1
+        status, body = _admin_call(request, base + "/unload", {})
+        if status == 200:
+            if not confirm:
+                logger.info("warden LLM evicted from GPU (attempt %d)", attempt)
+                return True
+            for _ in range(6):
+                queried, state = _admin_call(request, base + "/status", None)
+                if queried == 200 and not state.get("loaded_model"):
+                    logger.info("warden LLM evicted from GPU (attempt %d)", attempt)
+                    return True
+                time.sleep(1.0)
+            logger.warning("warden /admin/unload returned 200 but /admin/status still reports a model")
+            return False
+        if status == 409:
+            if time.monotonic() + poll_s > deadline:
+                logger.warning("warden stayed busy for %.0fs; giving up on unload — %s",
+                               max_wait_s, str(body)[:120])
+                return False
+            logger.info("warden busy (attempt %d): requests in flight, retrying in %.0fs — %s",
+                        attempt, poll_s, str(body)[:120])
+            time.sleep(poll_s)
+            continue
+        if status is None:
+            logger.warning("warden /admin/unload unreachable; not waiting")
+            return False
+        logger.warning("warden /admin/unload returned %d — %s", status, str(body)[:120])
+        return False
+
+
 def ensure_gpu_headroom(
     required_gb: float = ASR_MIN_FREE_GB,
     admin_url: str = DEFAULT_ADMIN_URL,
@@ -116,7 +229,7 @@ def ensure_gpu_headroom(
         "warden LLM",
         caller, free_gb, required_gb,
     )
-    unload_warden(admin_url)
+    unload_and_wait(admin_url)
 
     # Poll for the eviction to land; warden's 200 means "GPU clear", but a
     # few seconds of tolerance costs nothing and covers an async teardown.

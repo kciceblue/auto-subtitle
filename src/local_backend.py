@@ -290,7 +290,16 @@ def temporary_local_writer(
         log.parent.mkdir(parents=True, exist_ok=True)
         with log.open("a", encoding="utf-8") as output:
             unload_attempted = True
-            _request_json(admin_url.rstrip("/") + "/unload", {}, admin=True, timeout=45)
+            from src.warden import unload_and_wait
+            # Same transport (admin token, timeout, error convention) as the rest
+            # of this writer, and the same single unload call as before: a 200 is
+            # this caller's "GPU clear" contract, the launch follows immediately.
+            unloaded = unload_and_wait(
+                admin_url.rstrip("/"), confirm=False,
+                admin_request=lambda url, payload=None: _request_json(
+                    url, payload, admin=True, timeout=45))
+            if not unloaded:
+                raise LocalBackendError("Warden could not be unloaded for the local writer (busy or refused)")
             reserved.close()
             process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT,
                                        start_new_session=True)

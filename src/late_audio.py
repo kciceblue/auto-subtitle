@@ -463,7 +463,12 @@ def _gpu_lifecycle(admin_url: str, path: Path):
     receipt = {"started_utc": _now(), "original_loaded_model": original, "restored": False,
                "owned_workers_stopped": True}
     try:
-        _request_json(base + "/unload", {})
+        # A 409 here means requests are in flight on Warden — very often the
+        # agent's own backend answering a chat turn. Those finish in seconds,
+        # so back off and retry instead of failing the whole GPU stage.
+        from src.warden import unload_and_wait
+        if not unload_and_wait(base, admin_request=_request_json):
+            raise RuntimeError("Warden unload was not confirmed (busy or refused)")
         if _backend_identity(_request_json(base + "/status")) is not None:
             raise RuntimeError("Warden unload was not confirmed")
         yield receipt
